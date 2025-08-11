@@ -34,18 +34,15 @@ const Index = () => {
   const [vendas, setVendas] = useState<{ id: string; data: string; unidades: number; preco_unitario: number }[]>([]);
   const [cas, setCas] = useState<{ id: string; nome: string; status: "aliado" | "neutro"; relacao: string; humor: string; desafios: string; oportunidades: string }[]>([]);
   const [agenda, setAgenda] = useState<{ id: string; data: string; titulo: string; notas?: string }[]>([]);
-  const [sb, setSb] = useState<any>(null);
-  // Alias seguro: evita erros quando Supabase não está conectado
-  const supabase: any = sb ?? { from: () => ({
-    select: async () => ({ data: [], error: null }),
-    insert: async () => ({ data: null, error: { message: 'Conecte o Supabase e recarregue.' } })
-  }) };
 
-  // Inicializar Supabase dinamicamente
-  useEffect(()=>{
-    // @ts-ignore - caminho válido após conectar o Supabase na Lovable
-    import(/* @vite-ignore */ "@/integrations/supabase/client").then(m=>setSb(m.supabase)).catch(()=>{});
-  },[]);
+  // Stub seguro do Supabase para compilar sem integração ativa
+  const supabase: any = {
+    from: () => ({
+      select: async () => ({ data: [], error: null }),
+      insert: async () => ({ data: null, error: { message: 'Conecte o Supabase (botão verde) e recarregue.' } })
+    })
+  };
+
 
   // Carregar dados
   useEffect(() => {
@@ -382,7 +379,7 @@ const Index = () => {
                 <form onSubmit={addCA} className="grid md:grid-cols-6 gap-2">
                   <Input name="nome" placeholder="Nome do CA" className="md:col-span-2" />
                   <Select name="status" defaultValue="neutro" onValueChange={(v)=>{
-                    const el = document.querySelector<HTMLInputElement>('input[name="status-hidden"]');
+                    const el = document.querySelector<HTMLInputElement>('input[name="status"]');
                     if(el) el.value = v;
                   }}>
                     <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
