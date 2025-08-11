@@ -17,6 +17,7 @@ import { toast } from "@/hooks/use-toast";
 
 // Tipos
 type Turno = "manha" | "tarde" | "noite";
+type Dia = "seg" | "ter" | "qua" | "qui" | "sex";
 
 type Camarada = { id: string; nome: string; curso: string; turnos: Turno[] };
 
@@ -28,7 +29,7 @@ const Index = () => {
   // Estados gerais
   const [camaradas, setCamaradas] = useState<Camarada[]>([]);
   const [institutos, setInstitutos] = useState<{ id: string; nome: string }[]>([]);
-  const [escala, setEscala] = useState<{ id: string; camarada_id: string; instituto_id: string; turno: Turno }[]>([]);
+  const [escala, setEscala] = useState<{ id: string; camarada_id: string; instituto_id: string; turno: Turno; dia?: Dia }[]>([]);
   const [insumos, setInsumos] = useState<{ id: string; nome: string; custo_unitario: number }[]>([]);
   const [custosFixos, setCustosFixos] = useState<{ id: string; nome: string; valor_mensal: number }[]>([]);
   const [vendas, setVendas] = useState<{ id: string; data: string; unidades: number; preco_unitario: number }[]>([]);
@@ -42,7 +43,9 @@ const Index = () => {
       insert: async () => ({ data: null, error: { message: 'Conecte o Supabase (botão verde) e recarregue.' } })
     })
   };
-
+const [metaLucroBruto, setMetaLucroBruto] = useState<number | undefined>(undefined);
+const [metaLucroLiquido, setMetaLucroLiquido] = useState<number | undefined>(undefined);
+const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | undefined>(undefined);
 
   // Carregar dados
   useEffect(() => {
@@ -51,7 +54,7 @@ const Index = () => {
         const tables = [
           supabase.from("camaradas").select("id,nome,curso,turnos"),
           supabase.from("institutos").select("id,nome"),
-          supabase.from("escala").select("id,camarada_id,instituto_id,turno"),
+          supabase.from("escala").select("id,camarada_id,instituto_id,turno,dia"),
           supabase.from("insumos").select("id,nome,custo_unitario"),
           supabase.from("custos_fixos").select("id,nome,valor_mensal"),
           supabase.from("vendas_diarias").select("id,data,unidades,preco_unitario"),
@@ -84,10 +87,12 @@ const Index = () => {
   }, [vendas]);
   const unidadesMes = useMemo(()=> vendasMes.reduce((s,v)=>s+v.unidades,0), [vendasMes]);
   const receitaMes = useMemo(()=> vendasMes.reduce((s,v)=>s + v.unidades*v.preco_unitario,0), [vendasMes]);
-  const custoVariavelMes = useMemo(()=> unidadesMes * custoVariavelPorUnidade, [unidadesMes,custoVariavelPorUnidade]);
+  const custoVarUnidEfetivo = useMemo(()=> (custoVariavelOverride ?? custoVariavelPorUnidade), [custoVariavelOverride, custoVariavelPorUnidade]);
+  const custoVariavelMes = useMemo(()=> unidadesMes * custoVarUnidEfetivo, [unidadesMes,custoVarUnidEfetivo]);
   const custoFixoDilPorUnid = useMemo(()=> unidadesMes>0 ? totalCustosFixos / unidadesMes : 0, [totalCustosFixos, unidadesMes]);
   const lucroBrutoMes = useMemo(()=> receitaMes - custoVariavelMes, [receitaMes,custoVariavelMes]);
   const lucroLiquidoMes = useMemo(()=> receitaMes - custoVariavelMes - totalCustosFixos, [receitaMes,custoVariavelMes,totalCustosFixos]);
+  const precoMedio = useMemo(()=> unidadesMes>0 ? receitaMes / unidadesMes : 0, [receitaMes, unidadesMes]);
 
   // Helpers
   const notifyOk = (msg: string) => toast({ title: msg });
@@ -158,6 +163,34 @@ const Index = () => {
     setCustosFixos((p)=>[...(data as any), ...p]);
     e.currentTarget.reset();
     notifyOk("Custo fixo adicionado!");
+  };
+
+  const updateInsumo = async (id: string, patch: Partial<{ nome: string; custo_unitario: number }>) => {
+    const { error } = await supabase.from("insumos").update(patch).eq("id", id).select();
+    if (error) return notifyErr(error.message);
+    setInsumos((prev) => prev.map((i) => (i.id === id ? { ...i, ...patch } : i)));
+    notifyOk("Insumo atualizado!");
+  };
+
+  const deleteInsumo = async (id: string) => {
+    const { error } = await supabase.from("insumos").delete().eq("id", id);
+    if (error) return notifyErr(error.message);
+    setInsumos((prev) => prev.filter((i) => i.id !== id));
+    notifyOk("Insumo removido!");
+  };
+
+  const updateCustoFixo = async (id: string, patch: Partial<{ nome: string; valor_mensal: number }>) => {
+    const { error } = await supabase.from("custos_fixos").update(patch).eq("id", id).select();
+    if (error) return notifyErr(error.message);
+    setCustosFixos((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
+    notifyOk("Custo fixo atualizado!");
+  };
+
+  const deleteCustoFixo = async (id: string) => {
+    const { error } = await supabase.from("custos_fixos").delete().eq("id", id);
+    if (error) return notifyErr(error.message);
+    setCustosFixos((prev) => prev.filter((c) => c.id !== id));
+    notifyOk("Custo fixo removido!");
   };
 
   const addVenda = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -314,9 +347,34 @@ const Index = () => {
                     <Input name="custo" type="number" step="0.01" placeholder="R$" />
                     <Button type="submit">Adicionar</Button>
                   </form>
-                  <ul className="text-sm text-muted-foreground space-y-1">
-                    {insumos.map(i=> <li key={i.id}>{i.nome} • R$ {i.custo_unitario.toFixed(2)}</li>)}
-                  </ul>
+
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Insumo</TableHead>
+                        <TableHead>Custo/unid.</TableHead>
+                        <TableHead>Ações</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {insumos.map(i=> (
+                        <TableRow key={i.id}>
+                          <TableCell className="max-w-[200px]">
+                            <Input value={i.nome} onChange={(e)=> setInsumos(prev=> prev.map(it=> it.id===i.id? {...it, nome:e.target.value}: it))} />
+                          </TableCell>
+                          <TableCell className="max-w-[160px]">
+                            <Input type="number" step="0.01" value={i.custo_unitario}
+                              onChange={(e)=> setInsumos(prev=> prev.map(it=> it.id===i.id? {...it, custo_unitario: Number(e.target.value||0)}: it))}
+                            />
+                          </TableCell>
+                          <TableCell className="flex gap-2">
+                            <Button variant="secondary" size="sm" onClick={()=> updateInsumo(i.id, { nome: i.nome, custo_unitario: i.custo_unitario })}>Salvar</Button>
+                            <Button variant="destructive" size="sm" onClick={()=> deleteInsumo(i.id)}>Excluir</Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </CardContent>
               </Card>
 
@@ -328,9 +386,33 @@ const Index = () => {
                     <Input name="valor" type="number" step="0.01" placeholder="R$" />
                     <Button type="submit">Adicionar</Button>
                   </form>
-                  <ul className="text-sm text-muted-foreground space-y-1">
-                    {custosFixos.map(c=> <li key={c.id}>{c.nome} • R$ {c.valor_mensal.toFixed(2)}/mês</li>)}
-                  </ul>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nome</TableHead>
+                        <TableHead>Valor mensal</TableHead>
+                        <TableHead>Ações</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {custosFixos.map(c=> (
+                        <TableRow key={c.id}>
+                          <TableCell className="max-w-[200px]">
+                            <Input value={c.nome} onChange={(e)=> setCustosFixos(prev=> prev.map(it=> it.id===c.id? {...it, nome:e.target.value}: it))} />
+                          </TableCell>
+                          <TableCell className="max-w-[160px]">
+                            <Input type="number" step="0.01" value={c.valor_mensal}
+                              onChange={(e)=> setCustosFixos(prev=> prev.map(it=> it.id===c.id? {...it, valor_mensal: Number(e.target.value||0)}: it))}
+                            />
+                          </TableCell>
+                          <TableCell className="flex gap-2">
+                            <Button variant="secondary" size="sm" onClick={()=> updateCustoFixo(c.id, { nome: c.nome, valor_mensal: c.valor_mensal })}>Salvar</Button>
+                            <Button variant="destructive" size="sm" onClick={()=> deleteCustoFixo(c.id)}>Excluir</Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </CardContent>
               </Card>
             </div>
