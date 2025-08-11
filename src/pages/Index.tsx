@@ -359,7 +359,7 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
           </TabsContent>
 
           <TabsContent value="financeiro" className="mt-6 space-y-6">
-            <div className="grid md:grid-cols-4 gap-4">
+            <div className="flex flex-col gap-8">
               <Card className="hover:shadow-md transition-shadow animate-fade-in">
                 <CardHeader><CardTitle>Resumo do mês</CardTitle></CardHeader>
                 <CardContent className="space-y-2">
@@ -585,7 +585,7 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
           </TabsContent>
 
           <TabsContent value="escala" className="mt-6 space-y-6">
-            <div className="grid md:grid-cols-2 gap-4">
+            <div className="flex flex-col gap-6">
               <Card>
                 <CardHeader><CardTitle>Institutos</CardTitle></CardHeader>
                 <CardContent className="space-y-4">
