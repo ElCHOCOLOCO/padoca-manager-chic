@@ -14,6 +14,7 @@ import { Calendar as CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
+import InsumosTabela14 from "@/components/finance/InsumosTabela14";
 
 // Tipos
 type Turno = "manha" | "tarde" | "noite";
@@ -373,41 +374,9 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
               </Card>
 
               <Card className="animate-fade-in">
-                <CardHeader><CardTitle>Insumos (custo por unidade)</CardTitle></CardHeader>
-                <CardContent className="space-y-4">
-                  <form onSubmit={addInsumo} className="grid grid-cols-3 gap-2">
-                    <Input name="nome" placeholder="Nome" />
-                    <Input name="custo" type="number" step="0.01" placeholder="R$" />
-                    <Button type="submit">Adicionar</Button>
-                  </form>
-
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Insumo</TableHead>
-                        <TableHead>Custo/unid.</TableHead>
-                        <TableHead>Ações</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {insumos.map(i=> (
-                        <TableRow key={i.id}>
-                          <TableCell className="max-w-[200px]">
-                            <Input value={i.nome} onChange={(e)=> setInsumos(prev=> prev.map(it=> it.id===i.id? {...it, nome:e.target.value}: it))} />
-                          </TableCell>
-                          <TableCell className="max-w-[160px]">
-                            <Input type="number" step="0.01" value={i.custo_unitario}
-                              onChange={(e)=> setInsumos(prev=> prev.map(it=> it.id===i.id? {...it, custo_unitario: Number(e.target.value||0)}: it))}
-                            />
-                          </TableCell>
-                          <TableCell className="flex gap-2">
-                            <Button variant="secondary" size="sm" onClick={()=> updateInsumo(i.id, { nome: i.nome, custo_unitario: i.custo_unitario })}>Salvar</Button>
-                            <Button variant="destructive" size="sm" onClick={()=> deleteInsumo(i.id)}>Excluir</Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                <CardHeader><CardTitle>Insumos (14 componentes)</CardTitle></CardHeader>
+                <CardContent>
+                  <InsumosTabela14 />
                 </CardContent>
               </Card>
 
