@@ -155,6 +155,71 @@ export type Database = {
         }
         Relationships: []
       }
+      insumo_recipe_items: {
+        Row: {
+          cost: number
+          created_at: string
+          id: string
+          idx: number
+          name: string
+          recipe_id: string
+          updated_at: string
+        }
+        Insert: {
+          cost?: number
+          created_at?: string
+          id?: string
+          idx: number
+          name?: string
+          recipe_id: string
+          updated_at?: string
+        }
+        Update: {
+          cost?: number
+          created_at?: string
+          id?: string
+          idx?: number
+          name?: string
+          recipe_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "insumo_recipe_items_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "insumo_recipes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      insumo_recipes: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          units_per_batch: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          units_per_batch?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          units_per_batch?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       kitchen_orders: {
         Row: {
           completed_at: string | null
