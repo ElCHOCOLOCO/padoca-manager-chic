@@ -25,6 +25,7 @@ const Index = () => {
   useEffect(() => {
     document.title = "Gestão de Padaria – Painel";
   }, []);
+  const todayLabel = format(new Date(), "dd/MM/yyyy");
 
   // Estados gerais
   const [camaradas, setCamaradas] = useState<Camarada[]>([]);
@@ -131,8 +132,9 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
     const camarada_id = String(fd.get("camarada")||"");
     const instituto_id = String(fd.get("inst")||"");
     const turno = String(fd.get("turno")||"") as Turno;
+    const dia = String(fd.get("dia")||"") as Dia;
     if(!camarada_id||!instituto_id||!turno) return notifyErr("Preencha todos os campos.");
-    const { data, error } = await supabase.from("escala").insert({ camarada_id, instituto_id, turno }).select();
+    const { data, error } = await supabase.from("escala").insert({ camarada_id, instituto_id, turno, dia: dia || null }).select();
     if(error) return notifyErr(error.message);
     setEscala((p)=>[...(data as any), ...p]);
     e.currentTarget.reset();
@@ -241,29 +243,60 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
     notifyOk("Compromisso adicionado!");
   };
 
-  // Visualização da escala por instituto e turno
-  const escalaMap = useMemo(()=>{
-    const map: Record<string, Record<Turno, string[]>> = {};
-    institutos.forEach(i=>{ map[i.id] = { manha:[], tarde:[], noite:[] }; });
+  // Escala semanal por instituto (seg-sex x turnos)
+  const dias: Dia[] = ["seg","ter","qua","qui","sex"];
+  const labelDia: Record<Dia,string> = { seg: "Seg", ter: "Ter", qua: "Qua", qui: "Qui", sex: "Sex" };
+  const labelTurno: Record<Turno,string> = { manha: "Manhã", tarde: "Tarde", noite: "Noite" };
+
+  const assignEscala = async (instituto_id: string, dia: Dia, turno: Turno, camarada_id: string) => {
+    if (!camarada_id) return;
+    const { data, error } = await supabase.from("escala").insert({ instituto_id, dia, turno, camarada_id }).select();
+    if (error) return notifyErr(error.message);
+    setEscala((p)=>[...(data as any), ...p]);
+    notifyOk("Atribuição adicionada!");
+  };
+
+  const removeEscala = async (id: string) => {
+    const { error } = await supabase.from("escala").delete().eq("id", id);
+    if (error) return notifyErr(error.message);
+    setEscala((p)=> p.filter(e=> e.id !== id));
+    notifyOk("Atribuição removida!");
+  };
+
+  const escalaSemanal = useMemo(()=>{
+    const map: Record<string, Record<Dia, Record<Turno, { id: string; camarada_id: string; nome: string }[]>>> = {};
+    institutos.forEach(i=>{
+      map[i.id] = {
+        seg: { manha: [], tarde: [], noite: [] },
+        ter: { manha: [], tarde: [], noite: [] },
+        qua: { manha: [], tarde: [], noite: [] },
+        qui: { manha: [], tarde: [], noite: [] },
+        sex: { manha: [], tarde: [], noite: [] },
+      };
+    });
     escala.forEach(e=>{
+      if (!e.dia) return;
       const nome = camaradas.find(c=>c.id===e.camarada_id)?.nome || "—";
-      if(map[e.instituto_id]) map[e.instituto_id][e.turno].push(nome);
+      if(map[e.instituto_id]){
+        (map[e.instituto_id] as any)[e.dia][e.turno].push({ id: e.id, camarada_id: e.camarada_id, nome });
+      }
     });
     return map;
   }, [escala, institutos, camaradas]);
 
   return (
     <main className="min-h-screen bg-background">
-      <header className="container py-10">
-        <h1 className="text-4xl font-bold font-playfair tracking-tight">
-          Gestão de Padaria
-        </h1>
-        <p className="text-muted-foreground mt-2">Cadastro, financeiro, CAs, escala e agenda – rápido e simples.</p>
+      <header className="container py-10 border-y">
+        <div className="flex items-end justify-between">
+          <h1 className="text-5xl font-bold font-playfair tracking-tight">Gestão de Padaria</h1>
+          <span className="text-sm text-muted-foreground">{todayLabel}</span>
+        </div>
+        <p className="text-muted-foreground mt-2">Cadastro, financeiro, CAs, escala e agenda — rápido e simples.</p>
       </header>
 
       <section className="container pb-20">
         <Tabs defaultValue="camaradas" className="w-full">
-          <TabsList className="grid grid-cols-5">
+          <TabsList className="grid grid-cols-5 sticky top-0 z-20 bg-background/80 backdrop-blur border-b rounded-none">
             <TabsTrigger value="camaradas">Camaradas</TabsTrigger>
             <TabsTrigger value="financeiro">Financeiro</TabsTrigger>
             <TabsTrigger value="cas">CAs</TabsTrigger>
@@ -326,8 +359,8 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
           </TabsContent>
 
           <TabsContent value="financeiro" className="mt-6 space-y-6">
-            <div className="grid md:grid-cols-3 gap-4">
-              <Card className="hover:shadow-md transition-shadow">
+            <div className="grid md:grid-cols-4 gap-4">
+              <Card className="hover:shadow-md transition-shadow animate-fade-in">
                 <CardHeader><CardTitle>Resumo do mês</CardTitle></CardHeader>
                 <CardContent className="space-y-2">
                   <div>Receita: <strong>R$ {receitaMes.toFixed(2)}</strong></div>
@@ -339,7 +372,7 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="animate-fade-in">
                 <CardHeader><CardTitle>Insumos (custo por unidade)</CardTitle></CardHeader>
                 <CardContent className="space-y-4">
                   <form onSubmit={addInsumo} className="grid grid-cols-3 gap-2">
@@ -378,7 +411,7 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="animate-fade-in">
                 <CardHeader><CardTitle>Custos fixos (mensal)</CardTitle></CardHeader>
                 <CardContent className="space-y-4">
                   <form onSubmit={addCustoFixo} className="grid grid-cols-3 gap-2">
@@ -415,6 +448,50 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
                   </Table>
                 </CardContent>
               </Card>
+
+              <Card className="animate-fade-in">
+                <CardHeader><CardTitle>Parâmetros e metas</CardTitle></CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label>Meta lucro bruto (mês)</Label>
+                      <Input type="number" step="0.01" value={metaLucroBruto ?? ''} onChange={(e)=> setMetaLucroBruto(e.target.value===''? undefined : Number(e.target.value))} placeholder="R$" />
+                    </div>
+                    <div>
+                      <Label>Meta lucro líquido (mês)</Label>
+                      <Input type="number" step="0.01" value={metaLucroLiquido ?? ''} onChange={(e)=> setMetaLucroLiquido(e.target.value===''? undefined : Number(e.target.value))} placeholder="R$" />
+                    </div>
+                    <div className="col-span-2">
+                      <Label>Override de custo variável por unidade (opcional)</Label>
+                      <Input type="number" step="0.01" value={custoVariavelOverride ?? ''} onChange={(e)=> setCustoVariavelOverride(e.target.value===''? undefined : Number(e.target.value))} placeholder={`Atual: R$ ${custoVariavelPorUnidade.toFixed(2)}`} />
+                    </div>
+                  </div>
+                  <Button type="button" variant="secondary" onClick={()=> notifyOk("Parâmetros aplicados.")}>Aplicar</Button>
+                </CardContent>
+              </Card>
+
+              <Card className="animate-fade-in">
+                <CardHeader><CardTitle>Balanço e compatibilidade</CardTitle></CardHeader>
+                <CardContent className="space-y-2 text-sm">
+                  <div className="flex justify-between"><span>Entradas (receita)</span><strong>R$ {receitaMes.toFixed(2)}</strong></div>
+                  <div className="flex justify-between"><span>Saídas variáveis</span><strong>R$ {custoVariavelMes.toFixed(2)}</strong></div>
+                  <div className="flex justify-between"><span>Saídas fixas</span><strong>R$ {totalCustosFixos.toFixed(2)}</strong></div>
+                  <div className="flex justify-between border-t pt-2"><span>Lucro bruto</span><strong>R$ {lucroBrutoMes.toFixed(2)}</strong></div>
+                  <div className="flex justify-between"><span>Lucro líquido</span><strong>R$ {lucroLiquidoMes.toFixed(2)}</strong></div>
+                  <div className="text-muted-foreground">Preço médio: R$ {precoMedio.toFixed(2)} • Unidades mês: {unidadesMes}</div>
+                  <div className="mt-2">
+                    {metaLucroBruto !== undefined || metaLucroLiquido !== undefined ? (
+                      <Badge variant={(metaLucroBruto !== undefined && lucroBrutoMes < metaLucroBruto) || (metaLucroLiquido !== undefined && lucroLiquidoMes < metaLucroLiquido) ? 'destructive' : 'default'}>
+                        { (metaLucroBruto !== undefined && lucroBrutoMes < metaLucroBruto) || (metaLucroLiquido !== undefined && lucroLiquidoMes < metaLucroLiquido)
+                          ? 'Abaixo da meta'
+                          : 'Dentro da meta' }
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground">Defina metas para acompanhar compatibilidade.</span>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
             </div>
 
             <Card>
@@ -425,7 +502,7 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
                   <Input name="unidades" type="number" placeholder="Unidades" />
                   <Input name="preco" type="number" step="0.01" placeholder="Preço/unid." />
                   <div className="md:col-span-2 flex items-center gap-4 text-sm text-muted-foreground">
-                    <span>Custos variáveis/unid.: R$ {custoVariavelPorUnidade.toFixed(2)}</span>
+                    <span>Custos variáveis/unid.: R$ {custoVarUnidEfetivo.toFixed(2)}</span>
                     <span>Fixos/unid.: R$ {custoFixoDilPorUnid.toFixed(2)}</span>
                   </div>
                   <div className="md:col-span-5"><Button type="submit">Registrar</Button></div>
@@ -525,7 +602,7 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
               <Card>
                 <CardHeader><CardTitle>Designar camarada</CardTitle></CardHeader>
                 <CardContent>
-                  <form onSubmit={addEscala} className="grid md:grid-cols-4 gap-2">
+                  <form onSubmit={addEscala} className="grid md:grid-cols-5 gap-2">
                     <select name="camarada" className="border rounded-md px-3 py-2 bg-background">
                       <option value="">Camarada</option>
                       {camaradas.map(c=> <option key={c.id} value={c.id}>{c.nome}</option>)}
@@ -533,6 +610,14 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
                     <select name="inst" className="border rounded-md px-3 py-2 bg-background">
                       <option value="">Instituto</option>
                       {institutos.map(i=> <option key={i.id} value={i.id}>{i.nome}</option>)}
+                    </select>
+                    <select name="dia" className="border rounded-md px-3 py-2 bg-background">
+                      <option value="">Dia</option>
+                      <option value="seg">Segunda</option>
+                      <option value="ter">Terça</option>
+                      <option value="qua">Quarta</option>
+                      <option value="qui">Quinta</option>
+                      <option value="sex">Sexta</option>
                     </select>
                     <select name="turno" className="border rounded-md px-3 py-2 bg-background">
                       <option value="">Turno</option>
@@ -546,31 +631,48 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
               </Card>
             </div>
 
-            <Card>
-              <CardHeader><CardTitle>Visualização da escala</CardTitle></CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Instituto</TableHead>
-                      <TableHead>Manhã</TableHead>
-                      <TableHead>Tarde</TableHead>
-                      <TableHead>Noite</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {institutos.map(i=> (
-                      <TableRow key={i.id}>
-                        <TableCell>{i.nome}</TableCell>
-                        <TableCell>{escalaMap[i.id]?.manha?.join(', ') || '—'}</TableCell>
-                        <TableCell>{escalaMap[i.id]?.tarde?.join(', ') || '—'}</TableCell>
-                        <TableCell>{escalaMap[i.id]?.noite?.join(', ') || '—'}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+            <div className="space-y-6">
+              {institutos.map((i)=> (
+                <Card key={i.id} className="animate-fade-in">
+                  <CardHeader><CardTitle>{i.nome} — Escala semanal</CardTitle></CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Turno</TableHead>
+                          {dias.map(d=> (<TableHead key={d}>{labelDia[d]}</TableHead>))}
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {(["manha","tarde","noite"] as Turno[]).map((t)=> (
+                          <TableRow key={t}>
+                            <TableCell className="font-medium">{labelTurno[t]}</TableCell>
+                            {dias.map((d)=> (
+                              <TableCell key={d}>
+                                <div className="flex flex-wrap gap-2">
+                                  {escalaSemanal[i.id]?.[d]?.[t]?.map((a)=> (
+                                    <Badge key={a.id} variant="secondary" className="flex items-center gap-1">
+                                      {a.nome}
+                                      <button onClick={()=> removeEscala(a.id)} aria-label="Remover" className="text-muted-foreground hover:text-foreground">×</button>
+                                    </Badge>
+                                  ))}
+                                </div>
+                                <div className="mt-2">
+                                  <select defaultValue="" className="border rounded-md px-2 py-1 bg-background text-sm" onChange={(e)=>{ const v=e.target.value; if(v){ assignEscala(i.id, d, t, v); (e.target as HTMLSelectElement).value = ""; } }}>
+                                    <option value="">Adicionar…</option>
+                                    {camaradas.map(c=> (<option key={c.id} value={c.id}>{c.nome}</option>))}
+                                  </select>
+                                </div>
+                              </TableCell>
+                            ))}
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           </TabsContent>
 
           <TabsContent value="agenda" className="mt-6 space-y-6">
