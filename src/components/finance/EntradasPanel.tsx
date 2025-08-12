@@ -8,8 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
+import ExternalIntegrationBridge from "@/components/integration/ExternalIntegrationBridge";
+import type { Periodo } from "@/components/integration/types";
 
-export type Periodo = "daily" | "weekly" | "monthly";
+// Periodo type imported from integration/types
 
 interface Entrada {
   id: string;
@@ -33,6 +35,7 @@ export default function EntradasPanel() {
   const [extUrl, setExtUrl] = useState<string>(() => localStorage.getItem(STORAGE_KEY_URL) || "");
   const [instituteId, setInstituteId] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const [showEmbed, setShowEmbed] = useState(false);
 
   // Resolve user and institute
   useEffect(() => {
@@ -245,16 +248,36 @@ export default function EntradasPanel() {
           <div className="md:col-span-2">
             <Label>URL do aplicativo externo</Label>
             <Input value={extUrl} onChange={(e) => setExtUrl(e.target.value)} placeholder="https://sua-integracao.com/app" />
-            <p className="text-xs text-muted-foreground mt-1">Guardei localmente no seu navegador.</p>
+            <p className="text-xs text-muted-foreground mt-1">Guardei localmente no seu navegador. O app recebe contexto via querystring e postMessage.</p>
           </div>
           <div className="flex items-end gap-2">
             <Button variant="secondary" onClick={saveUrl}>Salvar URL</Button>
             <a href={extUrl || "#"} target="_blank" rel="noreferrer">
-              <Button disabled={!extUrl}>Abrir integração</Button>
+              <Button disabled={!extUrl}>Abrir nova aba</Button>
             </a>
+            <Button onClick={() => {
+              if (!extUrl) return toast({ title: "Informe a URL" });
+              if (!userId) return toast({ title: "Autentique-se para integrar" });
+              if (!instituteId) return toast({ title: "Configure seu instituto" });
+              setShowEmbed(true);
+            }} disabled={!extUrl}>
+              Integrar na página
+            </Button>
           </div>
         </CardContent>
       </Card>
+
+      {showEmbed && extUrl && (
+        <ExternalIntegrationBridge
+          url={extUrl}
+          period={period}
+          dateRange={range}
+          userId={userId}
+          instituteId={instituteId}
+          onClose={() => setShowEmbed(false)}
+        />
+      )}
+
     </div>
   );
 }
