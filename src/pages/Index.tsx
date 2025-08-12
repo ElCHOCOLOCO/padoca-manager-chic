@@ -15,6 +15,7 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import InsumosTabela14 from "@/components/finance/InsumosTabela14";
+import EntradasPanel from "@/components/finance/EntradasPanel";
 
 // Tipos
 type Turno = "manha" | "tarde" | "noite";
@@ -297,13 +298,15 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
 
       <section className="container pb-20">
         <Tabs defaultValue="camaradas" className="w-full">
-          <TabsList className="grid grid-cols-5 sticky top-0 z-20 bg-background/80 backdrop-blur border-b rounded-none">
+          <TabsList className="grid grid-cols-6 sticky top-0 z-20 bg-background/80 backdrop-blur border-b rounded-none">
             <TabsTrigger value="camaradas">Camaradas</TabsTrigger>
             <TabsTrigger value="financeiro">Financeiro</TabsTrigger>
+            <TabsTrigger value="entradas">Entradas</TabsTrigger>
             <TabsTrigger value="cas">CAs</TabsTrigger>
             <TabsTrigger value="escala">Escala</TabsTrigger>
             <TabsTrigger value="agenda">Agenda</TabsTrigger>
           </TabsList>
+
 
           <TabsContent value="camaradas" className="mt-6 space-y-6">
             <Card>
@@ -500,7 +503,12 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
             </Card>
           </TabsContent>
 
+          <TabsContent value="entradas" className="mt-6">
+            <EntradasPanel />
+          </TabsContent>
+
           <TabsContent value="cas" className="mt-6 space-y-6">
+
             <Card>
               <CardHeader><CardTitle>Mapeamento dos CAs</CardTitle></CardHeader>
               <CardContent className="space-y-4">
@@ -642,6 +650,56 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
                 </Card>
               ))}
             </div>
+
+            <Card className="animate-fade-in">
+              <CardHeader><CardTitle>Escala — visões gráficas (extra)</CardTitle></CardHeader>
+              <CardContent className="space-y-6">
+                <section>
+                  <h3 className="font-medium mb-2">Linha do tempo (simplificada)</h3>
+                  <div className="space-y-1">
+                    {camaradas.slice(0,10).map((c)=> (
+                      <div key={c.id} className="flex items-center gap-2">
+                        <div className="w-40 truncate text-sm">{c.nome}</div>
+                        <div className="flex gap-1">
+                          {(['seg','ter','qua','qui','sex'] as Dia[]).flatMap((d)=> (['manha','tarde','noite'] as Turno[]).map((t)=> {
+                            const assigned = escala.some(e=> e.camarada_id===c.id && e.dia===d && e.turno===t);
+                            return <div key={c.id+d+t} className={assigned ? 'h-3 w-3 rounded bg-primary/70' : 'h-3 w-3 rounded bg-muted'} title={`${d}-${t}`}></div>;
+                          }))}
+                        </div>
+                      </div>
+                    ))}
+                    {camaradas.length === 0 && (<p className="text-sm text-muted-foreground">Cadastre camaradas e atribuições para visualizar.</p>)}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">Mostrando até 10 camaradas.</p>
+                </section>
+
+                <section>
+                  <h3 className="font-medium mb-2">Heatmap de carga por instituto</h3>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    {institutos.map((i)=> (
+                      <div key={i.id} className="border rounded-md p-3">
+                        <div className="text-sm font-medium mb-2">{i.nome}</div>
+                        <div className="grid" style={{ gridTemplateColumns: '80px repeat(5, 1fr)' }}>
+                          <div></div>
+                          {(['seg','ter','qua','qui','sex'] as Dia[]).map((d)=> (<div key={d} className="text-center text-xs">{labelDia[d]}</div>))}
+                          {(['manha','tarde','noite'] as Turno[]).map((t)=> (
+                            <div key={t} className="contents">
+                              <div className="text-xs font-medium pr-2">{labelTurno[t]}</div>
+                              {(['seg','ter','qua','qui','sex'] as Dia[]).map((d)=> {
+                                const count = escala.filter(e=> e.instituto_id===i.id && e.dia===d && e.turno===t).length;
+                                const cls = count>=3 ? 'bg-primary/70' : count===2 ? 'bg-primary/50' : count===1 ? 'bg-primary/30' : 'bg-muted';
+                                return <div key={i.id+d+t} className={`h-6 rounded ${cls} flex items-center justify-center text-[10px]`}>{count||''}</div>;
+                              })}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                    {institutos.length === 0 && (<p className="text-sm text-muted-foreground">Cadastre institutos para visualizar.</p>)}
+                  </div>
+                </section>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="agenda" className="mt-6 space-y-6">
