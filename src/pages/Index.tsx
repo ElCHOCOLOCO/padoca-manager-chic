@@ -16,7 +16,6 @@ import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import InsumosTabela14 from "@/components/finance/InsumosTabela14";
 import EntradasPanel from "@/components/finance/EntradasPanel";
-import IntegrationTab from "@/components/integration/IntegrationTab";
 
 // Tipos
 type Turno = "manha" | "tarde" | "noite";
@@ -299,11 +298,10 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
 
       <section className="container pb-20">
         <Tabs defaultValue="camaradas" className="w-full">
-          <TabsList className="grid grid-cols-7 sticky top-0 z-20 bg-background/80 backdrop-blur border-b rounded-none">
+          <TabsList className="grid grid-cols-6 sticky top-0 z-20 bg-background/80 backdrop-blur border-b rounded-none">
             <TabsTrigger value="camaradas">Camaradas</TabsTrigger>
             <TabsTrigger value="financeiro">Financeiro</TabsTrigger>
             <TabsTrigger value="entradas">Entradas</TabsTrigger>
-            <TabsTrigger value="integracao">Integração</TabsTrigger>
             <TabsTrigger value="cas">CAs</TabsTrigger>
             <TabsTrigger value="escala">Escala</TabsTrigger>
             <TabsTrigger value="agenda">Agenda</TabsTrigger>
@@ -509,12 +507,7 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
             <EntradasPanel />
           </TabsContent>
 
-          <TabsContent value="integracao" className="mt-6">
-            <IntegrationTab />
-          </TabsContent>
-
           <TabsContent value="cas" className="mt-6 space-y-6">
-
 
             <Card>
               <CardHeader><CardTitle>Mapeamento dos CAs</CardTitle></CardHeader>
