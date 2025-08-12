@@ -134,6 +134,42 @@ export type Database = {
           },
         ]
       }
+      entradas: {
+        Row: {
+          amount: number
+          created_at: string
+          description: string | null
+          entry_date: string
+          id: string
+          institute_id: string
+          period: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          description?: string | null
+          entry_date?: string
+          id?: string
+          institute_id: string
+          period?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          description?: string | null
+          entry_date?: string
+          id?: string
+          institute_id?: string
+          period?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       institutes: {
         Row: {
           active: boolean
