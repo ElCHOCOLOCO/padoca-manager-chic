@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 import ExternalIntegrationBridge from "@/components/integration/ExternalIntegrationBridge";
 import type { Periodo } from "@/components/integration/types";
+import { DEFAULT_INSTITUTE_ID, DEFAULT_USER_ID } from "@/config";
 
 // Periodo type imported from integration/types
 
@@ -32,23 +33,10 @@ export default function EntradasPanel() {
   const [description, setDescription] = useState<string>("");
   const [entries, setEntries] = useState<Entrada[]>([]);
   const [loading, setLoading] = useState(false);
-  const [extUrl, setExtUrl] = useState<string>(() => localStorage.getItem(STORAGE_KEY_URL) || "");
-  const [instituteId, setInstituteId] = useState<string | null>(null);
-  const [userId, setUserId] = useState<string | null>(null);
+  const [extUrl, setExtUrl] = useState<string>(() => localStorage.getItem(STORAGE_KEY_URL) || "/plugin/marx-vendas");
+  const [instituteId] = useState<string | null>(DEFAULT_INSTITUTE_ID);
+  const [userId] = useState<string | null>(DEFAULT_USER_ID);
   const [showEmbed, setShowEmbed] = useState(false);
-
-  // Resolve user and institute
-  useEffect(() => {
-    const init = async () => {
-      const { data: auth } = await supabase.auth.getUser();
-      setUserId(auth.user?.id ?? null);
-      // maybeSingle avoids throw if no profile/institute set
-      const { data: iid } = await supabase.rpc("get_current_user_institute");
-      // iid may be null if not configured
-      setInstituteId((iid as any) ?? null);
-    };
-    init();
-  }, []);
 
   const range = useMemo(() => {
     const base = new Date(date + "T00:00:00");
@@ -75,6 +63,7 @@ export default function EntradasPanel() {
         .from("entradas")
         .select("*")
         .eq("period", period)
+        .eq("institute_id", DEFAULT_INSTITUTE_ID)
         .gte("entry_date", range.start)
         .lte("entry_date", range.end)
         .order("entry_date", { ascending: true });
@@ -94,8 +83,6 @@ export default function EntradasPanel() {
   }, [period, date]);
 
   const handleAdd = async () => {
-    if (!userId) return toast({ title: "Autentique-se para salvar" });
-    if (!instituteId) return toast({ title: "Configure seu instituto no perfil" });
     const amt = Number(amount);
     if (!amt || amt < 0) return toast({ title: "Informe um valor válido" });
 
@@ -105,8 +92,8 @@ export default function EntradasPanel() {
     if (period === "monthly") entryDate = range.start; // first day of month
 
     const payload = {
-      user_id: userId,
-      institute_id: instituteId,
+      user_id: userId!,
+      institute_id: instituteId!,
       entry_date: entryDate,
       period,
       amount: amt,
@@ -257,8 +244,6 @@ export default function EntradasPanel() {
             </a>
             <Button onClick={() => {
               if (!extUrl) return toast({ title: "Informe a URL" });
-              if (!userId) return toast({ title: "Autentique-se para integrar" });
-              if (!instituteId) return toast({ title: "Configure seu instituto" });
               setShowEmbed(true);
             }} disabled={!extUrl}>
               Integrar na página

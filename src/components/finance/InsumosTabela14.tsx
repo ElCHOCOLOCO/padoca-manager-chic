@@ -5,8 +5,9 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { DEFAULT_USER_ID } from "@/config";
 
  type Row = { id: number; nome: string; custo: number | "" };
 
@@ -143,12 +144,7 @@ function InsumosTabela14() {
   const handleSaveProduct = async () => {
     try {
       setSaving(true);
-      const { data: userData } = await supabase.auth.getUser();
-      const userId = userData?.user?.id;
-      if (!userId) {
-        toast({ title: "Faça login para salvar", description: "Você precisa estar autenticado." });
-        return;
-      }
+      const userId = DEFAULT_USER_ID;
 
       const { data: recipeInsert, error: recipeErr } = await supabase
         .from("insumo_recipes")

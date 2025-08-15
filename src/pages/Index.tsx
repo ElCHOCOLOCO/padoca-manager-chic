@@ -17,6 +17,7 @@ import { toast } from "@/hooks/use-toast";
 import InsumosTabela14 from "@/components/finance/InsumosTabela14";
 import EntradasPanel from "@/components/finance/EntradasPanel";
 import IntegrationTab from "@/components/integration/IntegrationTab";
+import { supabase as supabaseClient } from "@/integrations/supabase/client";
 
 // Tipos
 type Turno = "manha" | "tarde" | "noite";
@@ -40,16 +41,12 @@ const Index = () => {
   const [cas, setCas] = useState<{ id: string; nome: string; status: "aliado" | "neutro"; relacao: string; humor: string; desafios: string; oportunidades: string }[]>([]);
   const [agenda, setAgenda] = useState<{ id: string; data: string; titulo: string; notas?: string }[]>([]);
 
-  // Stub seguro do Supabase para compilar sem integração ativa
-  const supabase: any = {
-    from: () => ({
-      select: async () => ({ data: [], error: null }),
-      insert: async () => ({ data: null, error: { message: 'Conecte o Supabase (botão verde) e recarregue.' } })
-    })
-  };
+
 const [metaLucroBruto, setMetaLucroBruto] = useState<number | undefined>(undefined);
 const [metaLucroLiquido, setMetaLucroLiquido] = useState<number | undefined>(undefined);
 const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | undefined>(undefined);
+
+  const supabase: any = supabaseClient as any;
 
   // Carregar dados
   useEffect(() => {

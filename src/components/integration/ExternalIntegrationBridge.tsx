@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { CreateEntryPayload, DeleteEntryPayload, ExtMessage, HostContext, MSG, Periodo, RequestEntriesPayload, UpdateEntryPayload } from "./types";
+import { DEFAULT_INSTITUTE_ID } from "@/config";
 
 function getOrigin(url: string | null) {
   try { return url ? new URL(url).origin : "*"; } catch { return "*"; }
@@ -76,6 +77,7 @@ export default function ExternalIntegrationBridge({
               .from("entradas")
               .select("*")
               .eq("period", prd)
+              .eq("institute_id", ctx.instituteId ?? DEFAULT_INSTITUTE_ID)
               .gte("entry_date", start)
               .lte("entry_date", end)
               .order("entry_date", { ascending: true });
@@ -86,8 +88,8 @@ export default function ExternalIntegrationBridge({
           case MSG.CREATE_ENTRY: {
             const p = (msg.payload || {}) as CreateEntryPayload;
             const payload = {
-              user_id: ctx.userId,
-              institute_id: ctx.instituteId,
+              user_id: ctx.userId ?? "00000000-0000-0000-0000-000000000001",
+              institute_id: ctx.instituteId ?? DEFAULT_INSTITUTE_ID,
               entry_date: p.entry_date ?? ctx.range.start,
               period: p.period ?? ctx.period,
               amount: p.amount,
