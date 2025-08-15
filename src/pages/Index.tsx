@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -17,6 +17,7 @@ import { toast } from "@/hooks/use-toast";
 import InsumosTabela14 from "@/components/finance/InsumosTabela14";
 import EntradasPanel from "@/components/finance/EntradasPanel";
 import IntegrationTab from "@/components/integration/IntegrationTab";
+import ThemeToggle from "@/components/ThemeToggle";
 import { supabase as supabaseClient } from "@/integrations/supabase/client";
 
 // Tipos
@@ -285,18 +286,21 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
   }, [escala, institutos, camaradas]);
 
   return (
-    <main className="min-h-screen bg-background">
+    <main id="main" className="min-h-screen bg-background" role="main">
       <header className="container py-10 border-y">
         <div className="flex items-end justify-between">
           <h1 className="text-5xl font-bold font-playfair tracking-tight">Gestão de Padaria</h1>
-          <span className="text-sm text-muted-foreground">{todayLabel}</span>
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-muted-foreground" aria-live="polite">{todayLabel}</span>
+            <ThemeToggle />
+          </div>
         </div>
         <p className="text-muted-foreground mt-2">Cadastro, financeiro, CAs, escala e agenda — rápido e simples.</p>
       </header>
 
       <section className="container pb-20">
-        <Tabs defaultValue="camaradas" className="w-full">
-          <TabsList className="grid grid-cols-7 sticky top-0 z-20 bg-background/80 backdrop-blur border-b rounded-none">
+        <Tabs defaultValue="camaradas" className="w-full" activationMode="automatic">
+          <TabsList className="grid grid-cols-7 sticky top-0 z-20 bg-background/80 backdrop-blur border-b rounded-none" role="tablist" aria-label="Seções do painel">
             <TabsTrigger value="camaradas">Camaradas</TabsTrigger>
             <TabsTrigger value="financeiro">Financeiro</TabsTrigger>
             <TabsTrigger value="entradas">Entradas</TabsTrigger>
@@ -337,27 +341,28 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
                 <CardTitle>Lista</CardTitle>
               </CardHeader>
               <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Nome</TableHead>
-                      <TableHead>Curso</TableHead>
-                      <TableHead>Turnos</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {camaradas.map(c=> (
-                      <TableRow key={c.id}>
-                        <TableCell>{c.nome}</TableCell>
-                        <TableCell>{c.curso}</TableCell>
-                        <TableCell className="space-x-2">
-                          {c.turnos?.map(t=> <Badge key={t} variant="secondary">{t}</Badge>)}
-                        </TableCell>
+                                  <Table aria-labelledby="titulo-camaradas">
+                    <TableCaption id="titulo-camaradas">Lista de camaradas cadastrados</TableCaption>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nome</TableHead>
+                        <TableHead>Curso</TableHead>
+                        <TableHead>Turnos</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
+                    </TableHeader>
+                    <TableBody>
+                      {camaradas.map(c=> (
+                        <TableRow key={c.id}>
+                          <TableCell>{c.nome}</TableCell>
+                          <TableCell>{c.curso}</TableCell>
+                          <TableCell className="space-x-2">
+                            {c.turnos?.map(t=> <Badge key={t} variant="secondary">{t}</Badge>)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+</CardContent>
             </Card>
           </TabsContent>
 
@@ -390,34 +395,35 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
                     <Input name="valor" type="number" step="0.01" placeholder="R$" />
                     <Button type="submit">Adicionar</Button>
                   </form>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Nome</TableHead>
-                        <TableHead>Valor mensal</TableHead>
-                        <TableHead>Ações</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {custosFixos.map(c=> (
-                        <TableRow key={c.id}>
-                          <TableCell className="max-w-[200px]">
-                            <Input value={c.nome} onChange={(e)=> setCustosFixos(prev=> prev.map(it=> it.id===c.id? {...it, nome:e.target.value}: it))} />
-                          </TableCell>
-                          <TableCell className="max-w-[160px]">
-                            <Input type="number" step="0.01" value={c.valor_mensal}
-                              onChange={(e)=> setCustosFixos(prev=> prev.map(it=> it.id===c.id? {...it, valor_mensal: Number(e.target.value||0)}: it))}
-                            />
-                          </TableCell>
-                          <TableCell className="flex gap-2">
-                            <Button variant="secondary" size="sm" onClick={()=> updateCustoFixo(c.id, { nome: c.nome, valor_mensal: c.valor_mensal })}>Salvar</Button>
-                            <Button variant="destructive" size="sm" onClick={()=> deleteCustoFixo(c.id)}>Excluir</Button>
-                          </TableCell>
+                                      <Table aria-labelledby="titulo-custos">
+                      <TableCaption id="titulo-custos">Lista de custos fixos mensais</TableCaption>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Nome</TableHead>
+                          <TableHead>Valor mensal</TableHead>
+                          <TableHead>Ações</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </CardContent>
+                      </TableHeader>
+                      <TableBody>
+                        {custosFixos.map(c=> (
+                          <TableRow key={c.id}>
+                            <TableCell className="max-w-[200px]">
+                              <Input value={c.nome} onChange={(e)=> setCustosFixos(prev=> prev.map(it=> it.id===c.id? {...it, nome:e.target.value}: it))} />
+                            </TableCell>
+                            <TableCell className="max-w-[160px]">
+                              <Input type="number" step="0.01" value={c.valor_mensal}
+                                onChange={(e)=> setCustosFixos(prev=> prev.map(it=> it.id===c.id? {...it, valor_mensal: Number(e.target.value||0)}: it))}
+                              />
+                            </TableCell>
+                            <TableCell className="flex gap-2">
+                              <Button variant="secondary" size="sm" onClick={()=> updateCustoFixo(c.id, { nome: c.nome, valor_mensal: c.valor_mensal })}>Salvar</Button>
+                              <Button variant="destructive" size="sm" onClick={()=> deleteCustoFixo(c.id)}>Excluir</Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+</CardContent>
               </Card>
 
               <Card className="animate-fade-in">
@@ -478,7 +484,8 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
                   </div>
                   <div className="md:col-span-5"><Button type="submit">Registrar</Button></div>
                 </form>
-                <Table>
+                <Table aria-labelledby="titulo-vendas">
+                  <TableCaption id="titulo-vendas">Vendas registradas</TableCaption>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Data</TableHead>
@@ -535,7 +542,8 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
                   <Input name="oportunidades" placeholder="Oportunidades" />
                   <div className="md:col-span-6"><Button type="submit">Salvar</Button></div>
                 </form>
-                <Table>
+                <Table aria-labelledby="titulo-cas">
+                  <TableCaption id="titulo-cas">CAs mapeados</TableCaption>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Nome</TableHead>
@@ -617,7 +625,8 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
                 <Card key={i.id} className="animate-fade-in">
                   <CardHeader><CardTitle>{i.nome} — Escala semanal</CardTitle></CardHeader>
                   <CardContent>
-                    <Table>
+                    <Table aria-labelledby={`escala-${i.id}`}>
+                      <TableCaption id={`escala-${i.id}`}>Escala semanal por turno e dia</TableCaption>
                       <TableHeader>
                         <TableRow>
                           <TableHead>Turno</TableHead>
@@ -639,7 +648,8 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
                                   ))}
                                 </div>
                                 <div className="mt-2">
-                                  <select defaultValue="" className="border rounded-md px-2 py-1 bg-background text-sm" onChange={(e)=>{ const v=e.target.value; if(v){ assignEscala(i.id, d, t, v); (e.target as HTMLSelectElement).value = ""; } }}>
+                                  <label className="sr-only" htmlFor={`add-${i.id}-${d}-${t}`}>Adicionar camarada para {labelDia[d]} - {labelTurno[t]}</label>
+                                  <select id={`add-${i.id}-${d}-${t}`} defaultValue="" className="border rounded-md px-2 py-1 bg-background text-sm" onChange={(e)=>{ const v=e.target.value; if(v){ assignEscala(i.id, d, t, v); (e.target as HTMLSelectElement).value = ""; } }}>
                                     <option value="">Adicionar…</option>
                                     {camaradas.map(c=> (<option key={c.id} value={c.id}>{c.nome}</option>))}
                                   </select>
@@ -729,7 +739,8 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
                   <div className="md:col-span-4"><Button type="submit">Adicionar</Button></div>
                 </form>
 
-                <Table>
+                <Table aria-labelledby="titulo-agenda">
+                  <TableCaption id="titulo-agenda">Próximos compromissos</TableCaption>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Data</TableHead>
