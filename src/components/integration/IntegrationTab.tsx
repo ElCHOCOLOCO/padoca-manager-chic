@@ -8,25 +8,23 @@ import { supabase } from "@/integrations/supabase/client";
 import ExternalIntegrationBridge from "@/components/integration/ExternalIntegrationBridge";
 import type { Periodo } from "@/components/integration/types";
 import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, format } from "date-fns";
+import { DEFAULT_INSTITUTE_ID, DEFAULT_USER_ID } from "@/config";
 
 const STORAGE_KEY_URL = "integration_external_url";
 
 export default function IntegrationTab() {
-  const [url, setUrl] = useState<string>(() => localStorage.getItem(STORAGE_KEY_URL) || "");
+  const [url, setUrl] = useState<string>(() => localStorage.getItem(STORAGE_KEY_URL) || "/plugin/marx-vendas");
   const [period, setPeriod] = useState<Periodo>("daily");
   const [date, setDate] = useState<string>(() => new Date().toISOString().slice(0,10));
   const [show, setShow] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
-  const [instituteId, setInstituteId] = useState<string | null>(null);
+  const [userId] = useState<string | null>(DEFAULT_USER_ID);
+  const [instituteId] = useState<string | null>(DEFAULT_INSTITUTE_ID);
 
+  // Opcional: verificar conexão do Supabase
   useEffect(() => {
-    const init = async () => {
-      const { data: auth } = await supabase.auth.getUser();
-      setUserId(auth.user?.id ?? null);
-      const { data: iid } = await supabase.rpc("get_current_user_institute");
-      setInstituteId((iid as any) ?? null);
-    };
-    init();
+    (async () => {
+      try { await supabase.from("entradas").select("id").limit(1); } catch { /* ignore */ }
+    })();
   }, []);
 
   const range = useMemo(() => {
@@ -91,8 +89,6 @@ export default function IntegrationTab() {
           <div className="col-span-2 flex items-end gap-2">
             <Button onClick={()=> {
               if (!url) return toast({ title: 'Informe a URL'});
-              if (!userId) return toast({ title: 'Autentique-se' });
-              if (!instituteId) return toast({ title: 'Configure seu instituto' });
               setShow(true);
             }}>Integrar na página</Button>
           </div>
