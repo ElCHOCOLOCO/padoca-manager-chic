@@ -47,6 +47,10 @@ const [metaLucroBruto, setMetaLucroBruto] = useState<number | undefined>(undefin
 const [metaLucroLiquido, setMetaLucroLiquido] = useState<number | undefined>(undefined);
 const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | undefined>(undefined);
 
+// Estados para edição
+const [editingCA, setEditingCA] = useState<string | null>(null);
+const [editingEscala, setEditingEscala] = useState<string | null>(null);
+
   const supabase: any = supabaseClient as any;
 
   // Carregar dados
@@ -227,6 +231,37 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
     setCas((p)=>[...(data as any), ...p]);
     e.currentTarget.reset();
     notifyOk("CA cadastrado!");
+  };
+
+  const updateCA = async (id: string, payload: Partial<{ nome: string; status: "aliado" | "neutro"; relacao: string; humor: string; desafios: string; oportunidades: string }>) => {
+    const { error } = await supabase.from("cas").update(payload).eq("id", id);
+    if(error) return notifyErr(error.message);
+    setCas((prev) => prev.map((ca) => (ca.id === id ? { ...ca, ...payload } : ca)));
+    setEditingCA(null);
+    notifyOk("CA atualizado!");
+  };
+
+  const deleteCA = async (id: string) => {
+    const { error } = await supabase.from("cas").delete().eq("id", id);
+    if(error) return notifyErr(error.message);
+    setCas((prev) => prev.filter((ca) => ca.id !== id));
+    notifyOk("CA removido!");
+  };
+
+  const updateEscala = async (id: string, payload: Partial<{ camarada_id: string; instituto_id: string; turno: Turno; dia?: Dia }>) => {
+    const { error } = await supabase.from("escala").update(payload).eq("id", id);
+    if(error) return notifyErr(error.message);
+    setEscala((prev) => prev.map((e) => (e.id === id ? { ...e, ...payload } : e)));
+    setEditingEscala(null);
+    notifyOk("Escala atualizada!");
+  };
+
+  const updateEscalaCamarada = async (id: string, camarada_id: string) => {
+    await updateEscala(id, { camarada_id });
+  };
+
+  const updateEscalaInstituto = async (id: string, instituto_id: string) => {
+    await updateEscala(id, { instituto_id });
   };
 
   const [dataAgenda, setDataAgenda] = useState<Date | undefined>(undefined);
@@ -552,19 +587,95 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
                       <TableHead>Humor</TableHead>
                       <TableHead>Desafios</TableHead>
                       <TableHead>Oportunidades</TableHead>
+                      <TableHead>Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {cas.map(ca=> (
                       <TableRow key={ca.id}>
-                        <TableCell>{ca.nome}</TableCell>
                         <TableCell>
-                          <Badge variant={ca.status === 'aliado' ? 'default' : 'secondary'}>{ca.status}</Badge>
+                          {editingCA === ca.id ? (
+                            <Input
+                              defaultValue={ca.nome}
+                              onBlur={(e) => updateCA(ca.id, { nome: e.target.value })}
+                              onKeyDown={(e) => e.key === 'Enter' && updateCA(ca.id, { nome: e.currentTarget.value })}
+                              autoFocus
+                            />
+                          ) : (
+                            ca.nome
+                          )}
                         </TableCell>
-                        <TableCell>{ca.relacao}</TableCell>
-                        <TableCell>{ca.humor}</TableCell>
-                        <TableCell>{ca.desafios}</TableCell>
-                        <TableCell>{ca.oportunidades}</TableCell>
+                        <TableCell>
+                          {editingCA === ca.id ? (
+                            <Select defaultValue={ca.status} onValueChange={(value: "aliado" | "neutro") => updateCA(ca.id, { status: value })}>
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="aliado">Aliado</SelectItem>
+                                <SelectItem value="neutro">Neutro</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <Badge variant={ca.status === 'aliado' ? 'default' : 'secondary'}>{ca.status}</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {editingCA === ca.id ? (
+                            <Input
+                              defaultValue={ca.relacao}
+                              onBlur={(e) => updateCA(ca.id, { relacao: e.target.value })}
+                              onKeyDown={(e) => e.key === 'Enter' && updateCA(ca.id, { relacao: e.currentTarget.value })}
+                            />
+                          ) : (
+                            ca.relacao
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {editingCA === ca.id ? (
+                            <Input
+                              defaultValue={ca.humor}
+                              onBlur={(e) => updateCA(ca.id, { humor: e.target.value })}
+                              onKeyDown={(e) => e.key === 'Enter' && updateCA(ca.id, { humor: e.currentTarget.value })}
+                            />
+                          ) : (
+                            ca.humor
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {editingCA === ca.id ? (
+                            <Input
+                              defaultValue={ca.desafios}
+                              onBlur={(e) => updateCA(ca.id, { desafios: e.target.value })}
+                              onKeyDown={(e) => e.key === 'Enter' && updateCA(ca.id, { desafios: e.currentTarget.value })}
+                            />
+                          ) : (
+                            ca.desafios
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {editingCA === ca.id ? (
+                            <Input
+                              defaultValue={ca.oportunidades}
+                              onBlur={(e) => updateCA(ca.id, { oportunidades: e.target.value })}
+                              onKeyDown={(e) => e.key === 'Enter' && updateCA(ca.id, { oportunidades: e.currentTarget.value })}
+                            />
+                          ) : (
+                            ca.oportunidades
+                          )}
+                        </TableCell>
+                        <TableCell className="flex gap-2">
+                          {editingCA === ca.id ? (
+                            <>
+                              <Button size="sm" variant="secondary" onClick={() => setEditingCA(null)}>Cancelar</Button>
+                            </>
+                          ) : (
+                            <>
+                              <Button size="sm" variant="secondary" onClick={() => setEditingCA(ca.id)}>Editar</Button>
+                              <Button size="sm" variant="destructive" onClick={() => deleteCA(ca.id)}>Excluir</Button>
+                            </>
+                          )}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -642,8 +753,35 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
                                 <div className="flex flex-wrap gap-2">
                                   {escalaSemanal[i.id]?.[d]?.[t]?.map((a)=> (
                                     <Badge key={a.id} variant="secondary" className="flex items-center gap-1">
-                                      {a.nome}
-                                      <button onClick={()=> removeEscala(a.id)} aria-label="Remover" className="text-muted-foreground hover:text-foreground">×</button>
+                                      {editingEscala === a.id ? (
+                                        <div className="flex flex-col gap-1 text-xs">
+                                          <select 
+                                            defaultValue={a.camarada_id}
+                                            className="bg-transparent border-none p-0"
+                                            onChange={(e) => updateEscalaCamarada(a.id, e.target.value)}
+                                          >
+                                            {camaradas.map(c => (
+                                              <option key={c.id} value={c.id}>{c.nome}</option>
+                                            ))}
+                                          </select>
+                                          <select 
+                                            defaultValue={i.id}
+                                            className="bg-transparent border-none p-0"
+                                            onChange={(e) => updateEscalaInstituto(a.id, e.target.value)}
+                                          >
+                                            {institutos.map(inst => (
+                                              <option key={inst.id} value={inst.id}>{inst.nome}</option>
+                                            ))}
+                                          </select>
+                                          <button onClick={() => setEditingEscala(null)} className="text-muted-foreground hover:text-foreground">✓</button>
+                                        </div>
+                                      ) : (
+                                        <>
+                                          {a.nome}
+                                          <button onClick={() => setEditingEscala(a.id)} className="text-muted-foreground hover:text-foreground">✎</button>
+                                          <button onClick={()=> removeEscala(a.id)} aria-label="Remover" className="text-muted-foreground hover:text-foreground">×</button>
+                                        </>
+                                      )}
                                     </Badge>
                                   ))}
                                 </div>
