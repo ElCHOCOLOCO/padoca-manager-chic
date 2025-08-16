@@ -568,10 +568,18 @@ function InsumosTabela14() {
                   <CardTitle className="text-base">{p.name}</CardTitle>
                 </CardHeader>
                 <CardContent className="pt-0 space-y-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="text-xs text-muted-foreground">Lote: {p.units_per_batch}</div>
-                    <div className="text-sm font-medium text-green-600">
-                      {brl.format(productCosts[p.id] || 0)}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-xs text-muted-foreground">Custo do lote:</div>
+                      <div className="text-sm font-medium text-green-600">
+                        {brl.format(productCosts[p.id] || 0)}
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-xs text-muted-foreground">Custo por unidade:</div>
+                      <div className="text-sm font-medium text-blue-600">
+                        {p.units_per_batch > 0 ? brl.format((productCosts[p.id] || 0) / p.units_per_batch) : brl.format(0)}
+                      </div>
                     </div>
                   </div>
                   <div className="flex gap-2">

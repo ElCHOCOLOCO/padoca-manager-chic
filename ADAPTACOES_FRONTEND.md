@@ -24,6 +24,11 @@
 - **Excluir com confirmação**: Diálogo de confirmação antes de excluir
 - **Salvar automático**: Alterações são salvas automaticamente
 
+#### **Informações Exibidas nos Cards:**
+- **Custo do lote**: Valor total para produzir o lote completo
+- **Custo por unidade**: Valor dividido pelo número de unidades do lote
+- **Cores diferenciadas**: Verde para custo do lote, azul para custo por unidade
+
 ### **2. Página Principal (`Index.tsx`)**
 
 #### **Melhorias na Escala:**
