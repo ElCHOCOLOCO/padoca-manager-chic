@@ -734,14 +734,19 @@ const [editingEscala, setEditingEscala] = useState<string | null>(null);
             <div className="space-y-6">
               {institutos.map((i)=> (
                 <Card key={i.id} className="animate-fade-in">
-                  <CardHeader><CardTitle>{i.nome} — Escala semanal</CardTitle></CardHeader>
+                  <CardHeader>
+                    <CardTitle>{i.nome} — Escala semanal</CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      Visualize e gerencie as escalas por turno e dia da semana
+                    </p>
+                  </CardHeader>
                   <CardContent>
                     <Table aria-labelledby={`escala-${i.id}`}>
                       <TableCaption id={`escala-${i.id}`}>Escala semanal por turno e dia</TableCaption>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Turno</TableHead>
-                          {dias.map(d=> (<TableHead key={d}>{labelDia[d]}</TableHead>))}
+                          <TableHead className="w-24">Turno</TableHead>
+                          {dias.map(d=> (<TableHead key={d} className="text-center">{labelDia[d]}</TableHead>))}
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -749,15 +754,15 @@ const [editingEscala, setEditingEscala] = useState<string | null>(null);
                           <TableRow key={t}>
                             <TableCell className="font-medium">{labelTurno[t]}</TableCell>
                             {dias.map((d)=> (
-                              <TableCell key={d}>
-                                <div className="flex flex-wrap gap-2">
+                              <TableCell key={d} className="text-center">
+                                <div className="flex flex-wrap gap-1 justify-center">
                                   {escalaSemanal[i.id]?.[d]?.[t]?.map((a)=> (
-                                    <Badge key={a.id} variant="secondary" className="flex items-center gap-1">
+                                    <Badge key={a.id} variant="secondary" className="flex items-center gap-1 text-xs">
                                       {editingEscala === a.id ? (
                                         <div className="flex flex-col gap-1 text-xs">
                                           <select 
                                             defaultValue={a.camarada_id}
-                                            className="bg-transparent border-none p-0"
+                                            className="bg-transparent border-none p-0 text-xs"
                                             onChange={(e) => updateEscalaCamarada(a.id, e.target.value)}
                                           >
                                             {camaradas.map(c => (
@@ -766,20 +771,20 @@ const [editingEscala, setEditingEscala] = useState<string | null>(null);
                                           </select>
                                           <select 
                                             defaultValue={i.id}
-                                            className="bg-transparent border-none p-0"
+                                            className="bg-transparent border-none p-0 text-xs"
                                             onChange={(e) => updateEscalaInstituto(a.id, e.target.value)}
                                           >
                                             {institutos.map(inst => (
                                               <option key={inst.id} value={inst.id}>{inst.nome}</option>
                                             ))}
                                           </select>
-                                          <button onClick={() => setEditingEscala(null)} className="text-muted-foreground hover:text-foreground">✓</button>
+                                          <button onClick={() => setEditingEscala(null)} className="text-muted-foreground hover:text-foreground text-xs">✓</button>
                                         </div>
                                       ) : (
                                         <>
-                                          {a.nome}
-                                          <button onClick={() => setEditingEscala(a.id)} className="text-muted-foreground hover:text-foreground">✎</button>
-                                          <button onClick={()=> removeEscala(a.id)} aria-label="Remover" className="text-muted-foreground hover:text-foreground">×</button>
+                                          <span className="truncate max-w-16">{a.nome}</span>
+                                          <button onClick={() => setEditingEscala(a.id)} className="text-muted-foreground hover:text-foreground text-xs">✎</button>
+                                          <button onClick={()=> removeEscala(a.id)} aria-label="Remover" className="text-muted-foreground hover:text-foreground text-xs">×</button>
                                         </>
                                       )}
                                     </Badge>
@@ -787,7 +792,18 @@ const [editingEscala, setEditingEscala] = useState<string | null>(null);
                                 </div>
                                 <div className="mt-2">
                                   <label className="sr-only" htmlFor={`add-${i.id}-${d}-${t}`}>Adicionar camarada para {labelDia[d]} - {labelTurno[t]}</label>
-                                  <select id={`add-${i.id}-${d}-${t}`} defaultValue="" className="border rounded-md px-2 py-1 bg-background text-sm" onChange={(e)=>{ const v=e.target.value; if(v){ assignEscala(i.id, d, t, v); (e.target as HTMLSelectElement).value = ""; } }}>
+                                  <select 
+                                    id={`add-${i.id}-${d}-${t}`} 
+                                    defaultValue="" 
+                                    className="border rounded-md px-2 py-1 bg-background text-xs w-full" 
+                                    onChange={(e)=>{ 
+                                      const v=e.target.value; 
+                                      if(v){
+                                        assignEscala(i.id, d, t, v); 
+                                        (e.target as HTMLSelectElement).value = ""; 
+                                      } 
+                                    }}
+                                  >
                                     <option value="">Adicionar…</option>
                                     {camaradas.map(c=> (<option key={c.id} value={c.id}>{c.nome}</option>))}
                                   </select>
@@ -804,7 +820,12 @@ const [editingEscala, setEditingEscala] = useState<string | null>(null);
             </div>
 
             <Card className="animate-fade-in">
-              <CardHeader><CardTitle>Escala — visões gráficas (extra)</CardTitle></CardHeader>
+              <CardHeader>
+                <CardTitle>Escala — Visualização Avançada</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Diferentes formas de visualizar e analisar as escalas
+                </p>
+              </CardHeader>
               <CardContent className="space-y-6">
                 <section>
                   <h3 className="font-medium mb-2">Linha do tempo (simplificada)</h3>
@@ -823,6 +844,52 @@ const [editingEscala, setEditingEscala] = useState<string | null>(null);
                     {camaradas.length === 0 && (<p className="text-sm text-muted-foreground">Cadastre camaradas e atribuições para visualizar.</p>)}
                   </div>
                   <p className="text-xs text-muted-foreground mt-2">Mostrando até 10 camaradas.</p>
+                </section>
+
+                <section>
+                  <h3 className="font-medium mb-2">Resumo da Escala</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="border rounded-md p-3">
+                      <div className="text-sm font-medium mb-2">Camaradas Ativos</div>
+                      <div className="text-2xl font-bold text-blue-600">{camaradas.length}</div>
+                      <div className="text-xs text-muted-foreground">Total de camaradas cadastrados</div>
+                    </div>
+                    <div className="border rounded-md p-3">
+                      <div className="text-sm font-medium mb-2">Institutos</div>
+                      <div className="text-2xl font-bold text-green-600">{institutos.length}</div>
+                      <div className="text-xs text-muted-foreground">Total de institutos</div>
+                    </div>
+                    <div className="border rounded-md p-3">
+                      <div className="text-sm font-medium mb-2">Atribuições</div>
+                      <div className="text-2xl font-bold text-purple-600">{escala.length}</div>
+                      <div className="text-xs text-muted-foreground">Total de escalas atribuídas</div>
+                    </div>
+                  </div>
+                </section>
+
+                <section>
+                  <h3 className="font-medium mb-2">Carga de Trabalho por Camarada</h3>
+                  <div className="space-y-2">
+                    {camaradas.slice(0, 5).map((c) => {
+                      const totalEscalas = escala.filter(e => e.camarada_id === c.id).length;
+                      const institutosAtribuidos = [...new Set(escala.filter(e => e.camarada_id === c.id).map(e => e.instituto_id))].length;
+                      return (
+                        <div key={c.id} className="flex items-center justify-between p-2 border rounded-md">
+                          <div>
+                            <div className="font-medium">{c.nome}</div>
+                            <div className="text-xs text-muted-foreground">{c.curso}</div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-medium">{totalEscalas} escalas</div>
+                            <div className="text-xs text-muted-foreground">{institutosAtribuidos} instituto(s)</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {camaradas.length === 0 && (
+                      <p className="text-sm text-muted-foreground">Nenhum camarada cadastrado.</p>
+                    )}
+                  </div>
                 </section>
 
                 <section>

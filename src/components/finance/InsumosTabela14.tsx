@@ -28,7 +28,7 @@ const initialRows: Row[] = Array.from({ length: 14 }, (_, i) => ({
   nome: `Componente ${i + 1}`,
   preco_unitario: 0,
   unidade: "kg" as Unidade,
-  quantidade_receita: 0,
+  quantidade_receita: 1,
   valor_total: 0,
 }));
 
@@ -76,20 +76,26 @@ function InsumosTabela14() {
   useEffect(() => {
     const loadRecipes = async () => {
       setLoadingRecipes(true);
-      const { data, error } = await supabase
-        .from("insumo_recipes")
-        .select("id, name, units_per_batch, created_at")
-        .order("created_at", { ascending: false });
-      if (error) {
-        console.error(error);
-        toast({ title: "Erro ao carregar produtos", description: error.message });
-      } else {
-        setRecipes((data as any) || []);
+      try {
+        const { data, error } = await supabase
+          .from("insumo_recipes")
+          .select("id, name, units_per_batch, created_at")
+          .order("created_at", { ascending: false });
         
-        // Carregar custos dos produtos
-        await loadProductCosts((data as any) || []);
+        if (error) {
+          console.error(error);
+          toast({ title: "Erro ao carregar produtos", description: error.message });
+        } else {
+          setRecipes((data as any) || []);
+          // Carregar custos dos produtos
+          await loadProductCosts((data as any) || []);
+        }
+      } catch (e) {
+        console.error("Erro ao carregar receitas:", e);
+        toast({ title: "Erro ao carregar produtos", description: "Erro de conexão" });
+      } finally {
+        setLoadingRecipes(false);
       }
-      setLoadingRecipes(false);
     };
     loadRecipes();
   }, []);
@@ -137,49 +143,54 @@ function InsumosTabela14() {
     const recipe = recipes.find((r) => r.id === recipeId);
     if (recipe) setUnidades(recipe.units_per_batch ?? "");
     
-    // Tentar carregar com as novas colunas primeiro
-    let { data, error } = await supabase
-      .from("insumo_recipe_items")
-      .select("idx, name, cost, unit, quantity")
-      .eq("recipe_id", recipeId)
-      .order("idx", { ascending: true });
-    
-    // Se falhar, tentar sem as novas colunas (compatibilidade)
-    if (error) {
-      const { data: fallbackData, error: fallbackError } = await supabase
+    try {
+      // Tentar carregar com as novas colunas primeiro
+      let { data, error } = await supabase
         .from("insumo_recipe_items")
-        .select("idx, name, cost")
+        .select("idx, name, cost, unit, quantity")
         .eq("recipe_id", recipeId)
         .order("idx", { ascending: true });
       
-      if (fallbackError) {
-        toast({ title: "Erro ao carregar itens", description: fallbackError.message });
-        return;
+      // Se falhar, tentar sem as novas colunas (compatibilidade)
+      if (error) {
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from("insumo_recipe_items")
+          .select("idx, name, cost")
+          .eq("recipe_id", recipeId)
+          .order("idx", { ascending: true });
+        
+        if (fallbackError) {
+          toast({ title: "Erro ao carregar itens", description: fallbackError.message });
+          return;
+        }
+        data = fallbackData;
       }
-      data = fallbackData;
+      
+      const mapped = initialRows.map((base) => {
+        const found = (data as any[])?.find((d) => d.idx === base.id);
+        return {
+          id: base.id,
+          nome: found?.name ?? base.nome,
+          preco_unitario: typeof found?.cost === "number" ? Number(found.cost) : 0,
+          unidade: found?.unit ?? "kg" as Unidade,
+          quantidade_receita: typeof found?.quantity === "number" ? Number(found.quantity) : 1,
+          valor_total: 0,
+        } as Row;
+      });
+      setRows(mapped);
+      
+      // Atualizar custo do produto carregado
+      const totalCost = mapped.reduce((sum, row) => {
+        const preco = typeof row.preco_unitario === "number" ? row.preco_unitario : 0;
+        const quantidade = typeof row.quantidade_receita === "number" ? row.quantidade_receita : 1;
+        return sum + (preco * quantidade);
+      }, 0);
+      
+      setProductCosts(prev => ({ ...prev, [recipeId]: totalCost }));
+    } catch (e) {
+      console.error("Erro ao carregar itens da receita:", e);
+      toast({ title: "Erro ao carregar itens", description: "Erro de conexão" });
     }
-    
-    const mapped = initialRows.map((base) => {
-      const found = (data as any[])?.find((d) => d.idx === base.id);
-      return {
-        id: base.id,
-        nome: found?.name ?? base.nome,
-        preco_unitario: typeof found?.cost === "number" ? Number(found.cost) : 0,
-        unidade: found?.unit ?? "kg" as Unidade,
-        quantidade_receita: typeof found?.quantity === "number" ? Number(found.quantity) : 1,
-        valor_total: 0,
-      } as Row;
-    });
-    setRows(mapped);
-    
-    // Atualizar custo do produto carregado
-    const totalCost = mapped.reduce((sum, row) => {
-      const preco = typeof row.preco_unitario === "number" ? row.preco_unitario : 0;
-      const quantidade = typeof row.quantidade_receita === "number" ? row.quantidade_receita : 1;
-      return sum + (preco * quantidade);
-    }, 0);
-    
-    setProductCosts(prev => ({ ...prev, [recipeId]: totalCost }));
   };
 
   const scheduleItemUpsert = (idx: number, nome: string, preco_unitario: number, unidade: Unidade, quantidade_receita: number) => {
@@ -190,32 +201,37 @@ function InsumosTabela14() {
     itemDebounceRef.current[idx] = window.setTimeout(async () => {
       if (!selectedRecipeId) return;
       
-      // Tentar salvar com as novas colunas primeiro
-      let { error } = await supabase
-        .from("insumo_recipe_items")
-        .upsert({ 
-          recipe_id: selectedRecipeId, 
-          idx, 
-          name: nome, 
-          cost: preco_unitario,
-          unit: unidade,
-          quantity: quantidade_receita
-        }, { onConflict: "recipe_id,idx" });
-      
-      // Se falhar, tentar sem as novas colunas (compatibilidade)
-      if (error) {
-        const { error: fallbackError } = await supabase
+      try {
+        // Tentar salvar com as novas colunas primeiro
+        let { error } = await supabase
           .from("insumo_recipe_items")
           .upsert({ 
             recipe_id: selectedRecipeId, 
             idx, 
             name: nome, 
-            cost: preco_unitario
+            cost: preco_unitario,
+            unit: unidade,
+            quantity: quantidade_receita
           }, { onConflict: "recipe_id,idx" });
         
-        if (fallbackError) {
-          toast({ title: "Erro ao salvar item", description: fallbackError.message });
+        // Se falhar, tentar sem as novas colunas (compatibilidade)
+        if (error) {
+          const { error: fallbackError } = await supabase
+            .from("insumo_recipe_items")
+            .upsert({ 
+              recipe_id: selectedRecipeId, 
+              idx, 
+              name: nome, 
+              cost: preco_unitario
+            }, { onConflict: "recipe_id,idx" });
+          
+          if (fallbackError) {
+            toast({ title: "Erro ao salvar item", description: fallbackError.message });
+          }
         }
+      } catch (e) {
+        console.error("Erro ao salvar item:", e);
+        toast({ title: "Erro ao salvar item", description: "Erro de conexão" });
       }
     }, 400);
   };
@@ -224,11 +240,16 @@ function InsumosTabela14() {
     if (unidadesDebounceRef.current) clearTimeout(unidadesDebounceRef.current);
     unidadesDebounceRef.current = window.setTimeout(async () => {
       if (!selectedRecipeId) return;
-      const { error } = await supabase
-        .from("insumo_recipes")
-        .update({ units_per_batch: value })
-        .eq("id", selectedRecipeId);
-      if (error) toast({ title: "Erro ao salvar unidades", description: error.message });
+      try {
+        const { error } = await supabase
+          .from("insumo_recipes")
+          .update({ units_per_batch: value })
+          .eq("id", selectedRecipeId);
+        if (error) toast({ title: "Erro ao salvar unidades", description: error.message });
+      } catch (e) {
+        console.error("Erro ao salvar unidades:", e);
+        toast({ title: "Erro ao salvar unidades", description: "Erro de conexão" });
+      }
     }, 400);
   };
 
@@ -237,7 +258,7 @@ function InsumosTabela14() {
     if (selectedRecipeId) {
       const row = rows.find((r) => r.id === id);
       if (row) {
-        scheduleItemUpsert(id, value, typeof row.preco_unitario === "number" ? row.preco_unitario : 0, row.unidade, typeof row.quantidade_receita === "number" ? row.quantidade_receita : 0);
+        scheduleItemUpsert(id, value, typeof row.preco_unitario === "number" ? row.preco_unitario : 0, row.unidade, typeof row.quantidade_receita === "number" ? row.quantidade_receita : 1);
       }
     }
   };
@@ -248,7 +269,7 @@ function InsumosTabela14() {
     if (selectedRecipeId) {
       const row = rows.find((r) => r.id === id);
       if (row) {
-        scheduleItemUpsert(id, row.nome, precoNum, row.unidade, typeof row.quantidade_receita === "number" ? row.quantidade_receita : 0);
+        scheduleItemUpsert(id, row.nome, precoNum, row.unidade, typeof row.quantidade_receita === "number" ? row.quantidade_receita : 1);
       }
     }
   };
@@ -258,13 +279,13 @@ function InsumosTabela14() {
     if (selectedRecipeId) {
       const row = rows.find((r) => r.id === id);
       if (row) {
-        scheduleItemUpsert(id, row.nome, typeof row.preco_unitario === "number" ? row.preco_unitario : 0, value, typeof row.quantidade_receita === "number" ? row.quantidade_receita : 0);
+        scheduleItemUpsert(id, row.nome, typeof row.preco_unitario === "number" ? row.preco_unitario : 0, value, typeof row.quantidade_receita === "number" ? row.quantidade_receita : 1);
       }
     }
   };
 
   const handleQuantidadeChange = (id: number, value: string) => {
-    const quantidadeNum = value === "" ? 0 : Number(value);
+    const quantidadeNum = value === "" ? 1 : Number(value);
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, quantidade_receita: value === "" ? "" : quantidadeNum } : r)));
     if (selectedRecipeId) {
       const row = rows.find((r) => r.id === id);
