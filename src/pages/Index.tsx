@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 // Supabase: carregado dinamicamente para evitar erro quando não conectado
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -57,34 +57,35 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
   const supabase: any = supabaseClient as any;
 
   // Carregar dados
-  useEffect(() => {
-    const loadAll = async () => {
-      try {
-        const tables = [
-          supabase.from("camaradas").select("id,nome,curso,turnos"),
-          supabase.from("institutos").select("id,nome"),
-          supabase.from("escala").select("id,camarada_id,instituto_id,turno,dia"),
-          supabase.from("insumos").select("id,nome,custo_unitario"),
-          supabase.from("custos_fixos").select("id,nome,valor_mensal"),
-          supabase.from("vendas_diarias").select("id,data,unidades,preco_unitario"),
-          supabase.from("cas").select("id,nome,status,relacao,humor,desafios,oportunidades"),
-          supabase.from("agenda").select("id,data,titulo,notas"),
-        ];
-        const [c1,c2,c3,c4,c5,c6,c7,c8] = await Promise.all(tables);
-        if (!c1.error && c1.data) setCamaradas(c1.data as any);
-        if (!c2.error && c2.data) setInstitutos(c2.data as any);
-        if (!c3.error && c3.data) setEscala(c3.data as any);
-        if (!c4.error && c4.data) setInsumos(c4.data as any);
-        if (!c5.error && c5.data) setCustosFixos(c5.data as any);
-        if (!c6.error && c6.data) setVendas(c6.data as any);
-        if (!c7.error && c7.data) setCas(c7.data as any);
-        if (!c8.error && c8.data) setAgenda(c8.data as any);
-      } catch (e) {
-        console.warn("Conecte o Supabase para sincronizar dados.");
-      }
-    };
-    loadAll();
+  const loadAll = useCallback(async () => {
+    try {
+      const tables = [
+        supabase.from("camaradas").select("id,nome,curso,turnos"),
+        supabase.from("institutos").select("id,nome"),
+        supabase.from("escala").select("id,camarada_id,instituto_id,turno,dia"),
+        supabase.from("insumos").select("id,nome,custo_unitario"),
+        supabase.from("custos_fixos").select("id,nome,valor_mensal"),
+        supabase.from("vendas_diarias").select("id,data,unidades,preco_unitario"),
+        supabase.from("cas").select("id,nome,status,relacao,humor,desafios,oportunidades"),
+        supabase.from("agenda").select("id,data,titulo,notas"),
+      ];
+      const [c1,c2,c3,c4,c5,c6,c7,c8] = await Promise.all(tables);
+      if (!c1.error && c1.data) setCamaradas(c1.data as any);
+      if (!c2.error && c2.data) setInstitutos(c2.data as any);
+      if (!c3.error && c3.data) setEscala(c3.data as any);
+      if (!c4.error && c4.data) setInsumos(c4.data as any);
+      if (!c5.error && c5.data) setCustosFixos(c5.data as any);
+      if (!c6.error && c6.data) setVendas(c6.data as any);
+      if (!c7.error && c7.data) setCas(c7.data as any);
+      if (!c8.error && c8.data) setAgenda(c8.data as any);
+    } catch (e) {
+      console.warn("Conecte o Supabase para sincronizar dados.");
+    }
   }, []);
+
+  useEffect(() => {
+    loadAll();
+  }, [loadAll]);
 
   // Financeiro: cálculos
   const totalCustosFixos = useMemo(() => custosFixos.reduce((s,c)=>s + (c.valor_mensal||0), 0), [custosFixos]);

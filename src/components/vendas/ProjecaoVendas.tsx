@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { Loader2, TrendingUp, TrendingDown, Target, BarChart3 } from "lucide-react";
 
 type InstitutoVenda = {
   id: string;
@@ -77,6 +78,23 @@ const labelTurno: Record<string, string> = {
 
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
+// Debounce hook para otimizar inputs
+const useDebounce = (value: any, delay: number) => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+};
+
 function ProjecaoVendas() {
   const [institutos, setInstitutos] = useState<InstitutoVenda[]>([]);
   const [matrizVendas, setMatrizVendas] = useState<MatrizVenda[]>([]);
@@ -85,11 +103,16 @@ function ProjecaoVendas() {
   const [loading, setLoading] = useState(true);
   const [dataReferencia, setDataReferencia] = useState(new Date().toISOString().split('T')[0]);
   const [activeTab, setActiveTab] = useState('matriz');
+  const [isUpdating, setIsUpdating] = useState(false);
 
   // Estados para edição inline
   const [editingCell, setEditingCell] = useState<{instituto: string, dia: string} | null>(null);
   const [editProjecao, setEditProjecao] = useState<number>(0);
   const [editVendasReais, setEditVendasReais] = useState<number>(0);
+
+  // Debounce para inputs de edição
+  const debouncedProjecao = useDebounce(editProjecao, 300);
+  const debouncedVendasReais = useDebounce(editVendasReais, 300);
 
   // Estados para metas
   const [novaMeta, setNovaMeta] = useState({
@@ -109,11 +132,8 @@ function ProjecaoVendas() {
     demanda_esperada: 0
   });
 
-  useEffect(() => {
-    loadData();
-  }, [dataReferencia]);
-
-  const loadData = async () => {
+  // Memoizar loadData para evitar recriações desnecessárias
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       // Carregar institutos
@@ -124,7 +144,6 @@ function ProjecaoVendas() {
 
       if (institutosError) {
         console.error('Erro ao carregar institutos:', institutosError);
-        // Se não conseguir carregar institutos, mostrar erro mas continuar
         toast({ title: "Aviso", description: "Erro ao carregar institutos. Execute o SQL de inserção primeiro." });
         setInstitutos([]);
       } else {
@@ -190,9 +209,16 @@ function ProjecaoVendas() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [dataReferencia]);
 
-  const handleUpdateProjecao = async (institutoId: string, dia: string, turno: string, projecao: number, vendasReais: number) => {
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const handleUpdateProjecao = useCallback(async (institutoId: string, dia: string, turno: string, projecao: number, vendasReais: number) => {
+    if (isUpdating) return; // Prevenir múltiplas atualizações simultâneas
+    
+    setIsUpdating(true);
     try {
       // Primeiro, tentar usar a função RPC
       try {
@@ -263,10 +289,12 @@ function ProjecaoVendas() {
     } catch (error: any) {
       console.error('Erro ao atualizar projeção:', error);
       toast({ title: "Erro ao atualizar", description: error.message });
+    } finally {
+      setIsUpdating(false);
     }
-  };
+  }, [isUpdating, dataReferencia, loadData]);
 
-  const handleSaveMeta = async () => {
+  const handleSaveMeta = useCallback(async () => {
     try {
       const { error } = await supabase
         .from('metas_vendas')
@@ -287,9 +315,9 @@ function ProjecaoVendas() {
       console.error('Erro ao salvar meta:', error);
       toast({ title: "Erro ao salvar meta", description: error.message });
     }
-  };
+  }, [novaMeta, loadData]);
 
-  const handleSaveAnalise = async () => {
+  const handleSaveAnalise = useCallback(async () => {
     try {
       const { error } = await supabase.rpc('calcular_oferta_demanda', {
         p_instituto_id: novaAnalise.instituto_id,
@@ -315,30 +343,65 @@ function ProjecaoVendas() {
       console.error('Erro ao salvar análise:', error);
       toast({ title: "Erro ao salvar análise", description: error.message });
     }
-  };
+  }, [novaAnalise, dataReferencia, loadData]);
 
-  const getMatrizCell = (institutoCodigo: string, dia: string) => {
+  // Memoizar funções utilitárias
+  const getMatrizCell = useCallback((institutoCodigo: string, dia: string) => {
     return matrizVendas.find(m => m.codigo === institutoCodigo && m.dia === dia);
-  };
+  }, [matrizVendas]);
 
-  const getStatusColor = (percentual: number) => {
+  const getStatusColor = useCallback((percentual: number) => {
     if (percentual >= 90) return 'bg-green-100 text-green-800';
     if (percentual >= 70) return 'bg-yellow-100 text-yellow-800';
     return 'bg-red-100 text-red-800';
-  };
+  }, []);
 
-  const getOfertaDemandaColor = (status: string) => {
+  const getOfertaDemandaColor = useCallback((status: string) => {
     switch (status) {
       case 'Superávit': return 'bg-green-100 text-green-800';
       case 'Déficit': return 'bg-red-100 text-red-800';
       default: return 'bg-blue-100 text-blue-800';
     }
-  };
+  }, []);
+
+  // Memoizar cálculos de dashboard
+  const dashboardStats = useMemo(() => {
+    const totalProjetado = matrizVendas.reduce((sum, m) => sum + m.projecao, 0);
+    const totalVendido = matrizVendas.reduce((sum, m) => sum + m.vendas_reais, 0);
+    const diferencaTotal = matrizVendas.reduce((sum, m) => sum + m.diferenca, 0);
+    
+    return { totalProjetado, totalVendido, diferencaTotal };
+  }, [matrizVendas]);
+
+  const performancePorTurno = useMemo(() => {
+    return (['manha', 'tarde', 'noite'] as const).map(turno => {
+      const vendasTurno = matrizVendas.filter(m => m.turno === turno);
+      const totalProjetado = vendasTurno.reduce((sum, m) => sum + m.projecao, 0);
+      const totalVendido = vendasTurno.reduce((sum, m) => sum + m.vendas_reais, 0);
+      const percentual = totalProjetado > 0 ? (totalVendido / totalProjetado) * 100 : 0;
+
+      return { turno, totalVendido, percentual };
+    });
+  }, [matrizVendas]);
+
+  const topInstitutos = useMemo(() => {
+    return institutos
+      .map(instituto => {
+        const vendasInstituto = matrizVendas.filter(m => m.codigo === instituto.codigo);
+        const totalVendido = vendasInstituto.reduce((sum, m) => sum + m.vendas_reais, 0);
+        return { ...instituto, totalVendido };
+      })
+      .sort((a, b) => b.totalVendido - a.totalVendido)
+      .slice(0, 5);
+  }, [institutos, matrizVendas]);
 
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
-        <div className="text-lg">Carregando dados de vendas...</div>
+        <div className="flex items-center gap-2">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <div className="text-lg">Carregando dados de vendas...</div>
+        </div>
       </div>
     );
   }
@@ -361,10 +424,22 @@ function ProjecaoVendas() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="matriz">Matriz de Vendas</TabsTrigger>
-          <TabsTrigger value="analise">Análise Oferta/Demanda</TabsTrigger>
-          <TabsTrigger value="metas">Metas de Vendas</TabsTrigger>
-          <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+          <TabsTrigger value="matriz" className="flex items-center gap-2">
+            <BarChart3 className="h-4 w-4" />
+            Matriz de Vendas
+          </TabsTrigger>
+          <TabsTrigger value="analise" className="flex items-center gap-2">
+            <TrendingUp className="h-4 w-4" />
+            Análise Oferta/Demanda
+          </TabsTrigger>
+          <TabsTrigger value="metas" className="flex items-center gap-2">
+            <Target className="h-4 w-4" />
+            Metas de Vendas
+          </TabsTrigger>
+          <TabsTrigger value="dashboard" className="flex items-center gap-2">
+            <TrendingDown className="h-4 w-4" />
+            Dashboard
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="matriz" className="space-y-4">
@@ -441,14 +516,16 @@ function ProjecaoVendas() {
                                         editVendasReais
                                       )}
                                       className="text-xs px-2 h-6"
+                                      disabled={isUpdating}
                                     >
-                                      ✓
+                                      {isUpdating ? <Loader2 className="h-3 w-3 animate-spin" /> : "✓"}
                                     </Button>
                                     <Button
                                       size="sm"
                                       variant="outline"
                                       onClick={() => setEditingCell(null)}
                                       className="text-xs px-2 h-6"
+                                      disabled={isUpdating}
                                     >
                                       ×
                                     </Button>
@@ -709,19 +786,19 @@ function ProjecaoVendas() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="border rounded p-4 text-center">
                   <div className="text-2xl font-bold text-blue-600">
-                    {matrizVendas.reduce((sum, m) => sum + m.projecao, 0)}
+                    {dashboardStats.totalProjetado}
                   </div>
                   <div className="text-sm text-muted-foreground">Total Projetado</div>
                 </div>
                 <div className="border rounded p-4 text-center">
                   <div className="text-2xl font-bold text-green-600">
-                    {matrizVendas.reduce((sum, m) => sum + m.vendas_reais, 0)}
+                    {dashboardStats.totalVendido}
                   </div>
                   <div className="text-sm text-muted-foreground">Total Vendido</div>
                 </div>
                 <div className="border rounded p-4 text-center">
                   <div className="text-2xl font-bold text-purple-600">
-                    {matrizVendas.reduce((sum, m) => sum + m.diferenca, 0)}
+                    {dashboardStats.diferencaTotal}
                   </div>
                   <div className="text-sm text-muted-foreground">Diferença Total</div>
                 </div>
@@ -730,53 +807,38 @@ function ProjecaoVendas() {
               <div className="mt-6">
                 <h3 className="font-medium mb-4">Performance por Turno</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {(['manha', 'tarde', 'noite'] as const).map(turno => {
-                    const vendasTurno = matrizVendas.filter(m => m.turno === turno);
-                    const totalProjetado = vendasTurno.reduce((sum, m) => sum + m.projecao, 0);
-                    const totalVendido = vendasTurno.reduce((sum, m) => sum + m.vendas_reais, 0);
-                    const percentual = totalProjetado > 0 ? (totalVendido / totalProjetado) * 100 : 0;
-
-                    return (
-                      <div key={turno} className="border rounded p-4">
-                        <div className="font-medium">{labelTurno[turno]}</div>
-                        <div className="text-2xl font-bold">{totalVendido}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {percentual.toFixed(1)}% da meta
-                        </div>
+                  {performancePorTurno.map(({ turno, totalVendido, percentual }) => (
+                    <div key={turno} className="border rounded p-4">
+                      <div className="font-medium">{labelTurno[turno]}</div>
+                      <div className="text-2xl font-bold">{totalVendido}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {percentual.toFixed(1)}% da meta
                       </div>
-                    );
-                  })}
+                    </div>
+                  ))}
                 </div>
               </div>
 
               <div className="mt-6">
                 <h3 className="font-medium mb-4">Top 5 Institutos</h3>
                 <div className="space-y-2">
-                  {institutos
-                    .map(instituto => {
-                      const vendasInstituto = matrizVendas.filter(m => m.codigo === instituto.codigo);
-                      const totalVendido = vendasInstituto.reduce((sum, m) => sum + m.vendas_reais, 0);
-                      return { ...instituto, totalVendido };
-                    })
-                    .sort((a, b) => b.totalVendido - a.totalVendido)
-                    .slice(0, 5)
-                    .map((instituto, index) => (
-                      <div key={instituto.id} className="flex items-center justify-between border rounded p-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-6 h-6 bg-blue-100 text-blue-800 rounded-full flex items-center justify-center text-xs font-medium">
-                            {index + 1}
-                          </div>
-                          <div>
-                            <div className="font-medium">{instituto.codigo}</div>
-                            <div className="text-sm text-muted-foreground">{instituto.nome}</div>
-                          </div>
+                  {topInstitutos.map((instituto, index) => (
+                    <div key={instituto.id} className="flex items-center justify-between border rounded p-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-6 h-6 bg-blue-100 text-blue-800 rounded-full flex items-center justify-center text-xs font-medium">
+                          {index + 1}
                         </div>
-                        <div className="text-right">
-                          <div className="font-medium">{instituto.totalVendido}</div>
-                          <div className="text-sm text-muted-foreground">vendas</div>
+                        <div>
+                          <div className="font-medium">{instituto.codigo}</div>
+                          <div className="text-sm text-muted-foreground">{instituto.nome}</div>
                         </div>
                       </div>
-                    ))}
+                      <div className="text-right">
+                        <div className="font-medium">{instituto.totalVendido}</div>
+                        <div className="text-sm text-muted-foreground">vendas</div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             </CardContent>
