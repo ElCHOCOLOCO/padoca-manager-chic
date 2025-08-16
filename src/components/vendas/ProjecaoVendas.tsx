@@ -445,9 +445,9 @@ function ProjecaoVendas() {
         <TabsContent value="matriz" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Matriz Cartesiana de Vendas</CardTitle>
+              <CardTitle>Matriz de Vendas - Institutos vs Dias da Semana</CardTitle>
               <p className="text-sm text-muted-foreground">
-                Edite as projeções e vendas reais clicando nas células. Total de {institutos.length} institutos.
+                Institutos na lateral esquerda, dias da semana no topo. Clique nas células para editar projeção e vendas reais. Total de {institutos.length} institutos.
               </p>
             </CardHeader>
             <CardContent>
@@ -459,8 +459,9 @@ function ProjecaoVendas() {
                         <div className="font-bold text-center">Instituto</div>
                       </TableHead>
                       {diasSemana.map(dia => (
-                        <TableHead key={dia} className="text-center min-w-32 bg-muted/30">
-                          <div className="font-medium">{labelDia[dia]}</div>
+                        <TableHead key={dia} className="text-center min-w-40 bg-muted/30">
+                          <div className="font-medium text-lg">{labelDia[dia]}</div>
+                          <div className="text-xs text-muted-foreground">Proj | Vendeu</div>
                         </TableHead>
                       ))}
                     </TableRow>
@@ -469,12 +470,14 @@ function ProjecaoVendas() {
                     {institutos.map(instituto => (
                       <TableRow key={instituto.id} className="hover:bg-muted/30">
                         <TableCell className="font-medium bg-muted/20 sticky left-0 z-10 border-r">
-                          <div className="space-y-1">
-                            <div className="font-bold text-lg">{instituto.codigo}</div>
-                            <div className="text-sm text-muted-foreground leading-tight">{instituto.nome}</div>
-                            <Badge variant="outline" className="text-xs">
-                              {labelTurno[instituto.turno]}
-                            </Badge>
+                          <div className="space-y-2">
+                            <div className="font-bold text-xl text-center">{instituto.codigo}</div>
+                            <div className="text-sm text-muted-foreground leading-tight text-center">{instituto.nome}</div>
+                            <div className="flex justify-center">
+                              <Badge variant="outline" className="text-xs">
+                                {labelTurno[instituto.turno]}
+                              </Badge>
+                            </div>
                           </div>
                         </TableCell>
                         {diasSemana.map(dia => {
@@ -482,26 +485,26 @@ function ProjecaoVendas() {
                           const isEditing = editingCell?.instituto === instituto.codigo && editingCell?.dia === dia;
 
                           return (
-                            <TableCell key={dia} className="text-center p-2 min-w-32">
+                            <TableCell key={dia} className="text-center p-2 min-w-40">
                               {isEditing ? (
-                                <div className="space-y-2 p-2 border rounded bg-background">
+                                <div className="space-y-3 p-3 border rounded bg-background shadow-sm">
                                   <div>
-                                    <Label className="text-xs font-medium">Projeção:</Label>
+                                    <Label className="text-xs font-medium text-blue-600">Projeção:</Label>
                                     <Input
                                       type="number"
                                       value={editProjecao}
                                       onChange={(e) => setEditProjecao(Number(e.target.value))}
-                                      className="h-8 text-xs"
+                                      className="h-8 text-xs mt-1"
                                       placeholder="0"
                                     />
                                   </div>
                                   <div>
-                                    <Label className="text-xs font-medium">Vendas Reais:</Label>
+                                    <Label className="text-xs font-medium text-green-600">Vendeu:</Label>
                                     <Input
                                       type="number"
                                       value={editVendasReais}
                                       onChange={(e) => setEditVendasReais(Number(e.target.value))}
-                                      className="h-8 text-xs"
+                                      className="h-8 text-xs mt-1"
                                       placeholder="0"
                                     />
                                   </div>
@@ -533,19 +536,19 @@ function ProjecaoVendas() {
                                 </div>
                               ) : (
                                 <div 
-                                  className="cursor-pointer hover:bg-muted p-3 rounded border border-transparent hover:border-border transition-all min-h-20 flex flex-col justify-center"
+                                  className="cursor-pointer hover:bg-muted p-3 rounded border border-transparent hover:border-border transition-all min-h-24 flex flex-col justify-center"
                                   onClick={() => {
                                     setEditingCell({ instituto: instituto.codigo, dia });
                                     setEditProjecao(cell?.projecao || 0);
                                     setEditVendasReais(cell?.vendas_reais || 0);
                                   }}
                                 >
-                                  <div className="space-y-1">
+                                  <div className="space-y-2">
                                     <div className="text-sm font-medium text-blue-600">
                                       Proj: {cell?.projecao || 0}
                                     </div>
                                     <div className="text-sm font-medium text-green-600">
-                                      Real: {cell?.vendas_reais || 0}
+                                      Vendeu: {cell?.vendas_reais || 0}
                                     </div>
                                     {cell && cell.projecao > 0 && (
                                       <Badge 
