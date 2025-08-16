@@ -63,12 +63,16 @@ WHERE unit IS NULL OR quantity IS NULL;
 - ✅ Quantidade na receita
 - ✅ Cálculo automático do valor total
 - ✅ Persistência completa dos dados
+- ✅ **Exclusão de produtos** com confirmação
+- ✅ **Exibição do custo total** no card do produto
 
 ### Sem Migração (Funcionalidade Limitada)
 - ✅ Preço unitário
 - ✅ Nome do componente
 - ✅ Cálculo básico (assumindo quantidade = 1)
 - ✅ Compatibilidade total
+- ✅ **Exclusão de produtos** com confirmação
+- ✅ **Exibição do custo total** no card do produto
 
 ## Status Atual
 
@@ -77,6 +81,8 @@ WHERE unit IS NULL OR quantity IS NULL;
 - ✅ Erros 400 resolvidos com fallback
 - ✅ Funcionalidade financeira aprimorada
 - ✅ Botões de editar para CAs e escalas
+- ✅ **Exclusão de produtos** com confirmação
+- ✅ **Exibição do custo total** nos cards
 - ✅ Compatibilidade com estrutura atual do banco
 
 ## Próximos Passos

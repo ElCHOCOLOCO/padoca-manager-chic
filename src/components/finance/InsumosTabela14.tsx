@@ -45,6 +45,9 @@ function InsumosTabela14() {
   const [saveOpen, setSaveOpen] = useState(false);
   const [productName, setProductName] = useState("");
   const [saving, setSaving] = useState(false);
+  const [productCosts, setProductCosts] = useState<Record<string, number>>({});
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [productToDelete, setProductToDelete] = useState<string | null>(null);
 
   // Debounce timers for inline persistence
   const itemDebounceRef = useRef<Record<number, number>>({});
@@ -82,11 +85,53 @@ function InsumosTabela14() {
         toast({ title: "Erro ao carregar produtos", description: error.message });
       } else {
         setRecipes((data as any) || []);
+        
+        // Carregar custos dos produtos
+        await loadProductCosts((data as any) || []);
       }
       setLoadingRecipes(false);
     };
     loadRecipes();
   }, []);
+
+  const loadProductCosts = async (recipesList: Recipe[]) => {
+    const costs: Record<string, number> = {};
+    
+    for (const recipe of recipesList) {
+      try {
+        // Tentar carregar com as novas colunas primeiro
+        let { data, error } = await supabase
+          .from("insumo_recipe_items")
+          .select("cost, quantity")
+          .eq("recipe_id", recipe.id);
+        
+        // Se falhar, tentar sem as novas colunas (compatibilidade)
+        if (error) {
+          const { data: fallbackData, error: fallbackError } = await supabase
+            .from("insumo_recipe_items")
+            .select("cost")
+            .eq("recipe_id", recipe.id);
+          
+          if (fallbackError) continue;
+          data = fallbackData;
+        }
+        
+        // Calcular custo total
+        const totalCost = (data as any[])?.reduce((sum, item) => {
+          const cost = typeof item.cost === "number" ? item.cost : 0;
+          const quantity = typeof item.quantity === "number" ? item.quantity : 1;
+          return sum + (cost * quantity);
+        }, 0) || 0;
+        
+        costs[recipe.id] = totalCost;
+      } catch (e) {
+        console.error(`Erro ao carregar custo do produto ${recipe.id}:`, e);
+        costs[recipe.id] = 0;
+      }
+    }
+    
+    setProductCosts(costs);
+  };
 
   const loadRecipeItems = async (recipeId: string) => {
     const recipe = recipes.find((r) => r.id === recipeId);
@@ -126,6 +171,15 @@ function InsumosTabela14() {
       } as Row;
     });
     setRows(mapped);
+    
+    // Atualizar custo do produto carregado
+    const totalCost = mapped.reduce((sum, row) => {
+      const preco = typeof row.preco_unitario === "number" ? row.preco_unitario : 0;
+      const quantidade = typeof row.quantidade_receita === "number" ? row.quantidade_receita : 1;
+      return sum + (preco * quantidade);
+    }, 0);
+    
+    setProductCosts(prev => ({ ...prev, [recipeId]: totalCost }));
   };
 
   const scheduleItemUpsert = (idx: number, nome: string, preco_unitario: number, unidade: Unidade, quantidade_receita: number) => {
@@ -272,7 +326,11 @@ function InsumosTabela14() {
         if (fallbackErr) throw fallbackErr;
       }
 
+      // Calcular custo do novo produto
+      const newProductCost = rowsWithTotal.reduce((sum, row) => sum + row.valor_total, 0);
+      
       setRecipes((prev) => [{ ...(recipeInsert as any), id: recipeId }, ...prev]);
+      setProductCosts(prev => ({ ...prev, [recipeId]: newProductCost }));
       setSelectedRecipeId(recipeId);
       setSaveOpen(false);
       setProductName("");
@@ -281,6 +339,56 @@ function InsumosTabela14() {
       toast({ title: "Erro ao salvar produto", description: e.message });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const confirmDeleteProduct = (recipeId: string) => {
+    setProductToDelete(recipeId);
+    setDeleteConfirmOpen(true);
+  };
+
+  const deleteProduct = async () => {
+    if (!productToDelete) return;
+    
+    try {
+      // Primeiro deletar os itens da receita
+      const { error: itemsError } = await supabase
+        .from("insumo_recipe_items")
+        .delete()
+        .eq("recipe_id", productToDelete);
+      
+      if (itemsError) throw itemsError;
+
+      // Depois deletar a receita
+      const { error: recipeError } = await supabase
+        .from("insumo_recipes")
+        .delete()
+        .eq("id", productToDelete);
+      
+      if (recipeError) throw recipeError;
+
+      // Remover da lista local
+      setRecipes((prev) => prev.filter((r) => r.id !== productToDelete));
+      
+      // Remover custo do produto
+      setProductCosts(prev => {
+        const newCosts = { ...prev };
+        delete newCosts[productToDelete];
+        return newCosts;
+      });
+      
+      // Se o produto deletado era o selecionado, limpar seleção
+      if (selectedRecipeId === productToDelete) {
+        setSelectedRecipeId(null);
+        setRows(initialRows);
+        setUnidades("");
+      }
+
+      setDeleteConfirmOpen(false);
+      setProductToDelete(null);
+      toast({ title: "Produto excluído", description: "Produto e seus itens foram removidos." });
+    } catch (e: any) {
+      toast({ title: "Erro ao excluir produto", description: e.message });
     }
   };
 
@@ -410,6 +518,21 @@ function InsumosTabela14() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmar exclusão</DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              Tem certeza que deseja excluir este produto? Esta ação não pode ser desfeita.
+            </p>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setDeleteConfirmOpen(false)}>Cancelar</Button>
+            <Button variant="destructive" onClick={deleteProduct}>Excluir</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <section aria-labelledby="produtos-salvos-title" className="space-y-2">
         <h3 id="produtos-salvos-title" className="text-sm font-medium">Produtos salvos</h3>
         {loadingRecipes ? (
@@ -423,9 +546,31 @@ function InsumosTabela14() {
                 <CardHeader className="py-3">
                   <CardTitle className="text-base">{p.name}</CardTitle>
                 </CardHeader>
-                <CardContent className="pt-0 flex items-center justify-between gap-2">
-                  <div className="text-xs text-muted-foreground">Lote: {p.units_per_batch}</div>
-                  <Button size="sm" variant="secondary" onClick={async () => { setSelectedRecipeId(p.id); await loadRecipeItems(p.id); }}>Editar</Button>
+                <CardContent className="pt-0 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-xs text-muted-foreground">Lote: {p.units_per_batch}</div>
+                    <div className="text-sm font-medium text-green-600">
+                      {brl.format(productCosts[p.id] || 0)}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button 
+                      size="sm" 
+                      variant="secondary" 
+                      onClick={async () => { setSelectedRecipeId(p.id); await loadRecipeItems(p.id); }}
+                      className="flex-1"
+                    >
+                      Editar
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="destructive" 
+                      onClick={() => confirmDeleteProduct(p.id)}
+                      className="px-2"
+                    >
+                      ×
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             ))}
