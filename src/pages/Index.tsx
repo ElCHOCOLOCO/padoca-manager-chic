@@ -15,6 +15,7 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import InsumosTabela14 from "@/components/finance/InsumosTabela14";
+import ProjecaoVendas from "@/components/vendas/ProjecaoVendas";
 import EntradasPanel from "@/components/finance/EntradasPanel";
 import IntegrationTab from "@/components/integration/IntegrationTab";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -337,9 +338,10 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
 
       <section className="container pb-20">
         <Tabs defaultValue="camaradas" className="w-full" activationMode="automatic">
-          <TabsList className="grid grid-cols-7 sticky top-0 z-20 bg-background/80 backdrop-blur border-b rounded-none" role="tablist" aria-label="Seções do painel">
+          <TabsList className="grid grid-cols-8 sticky top-0 z-20 bg-background/80 backdrop-blur border-b rounded-none" role="tablist" aria-label="Seções do painel">
             <TabsTrigger value="camaradas">Camaradas</TabsTrigger>
             <TabsTrigger value="financeiro">Financeiro</TabsTrigger>
+            <TabsTrigger value="vendas">Vendas</TabsTrigger>
             <TabsTrigger value="entradas">Entradas</TabsTrigger>
             <TabsTrigger value="integracao">Integração</TabsTrigger>
             <TabsTrigger value="cas">CAs</TabsTrigger>
@@ -544,6 +546,10 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
                 </Table>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="vendas" className="mt-6 space-y-6">
+            <ProjecaoVendas />
           </TabsContent>
 
           <TabsContent value="entradas" className="mt-6">
