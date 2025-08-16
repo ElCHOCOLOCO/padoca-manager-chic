@@ -15,12 +15,14 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import InsumosTabela14 from "@/components/finance/InsumosTabela14";
-import ProjecaoVendas from "@/components/vendas/ProjecaoVendas";
 import EntradasPanel from "@/components/finance/EntradasPanel";
 import IntegrationTab from "@/components/integration/IntegrationTab";
 import ThemeToggle from "@/components/ThemeToggle";
 import { supabase as supabaseClient } from "@/integrations/supabase/client";
-import React from "react";
+import React, { Suspense, lazy } from "react";
+
+// Lazy loading para componentes pesados
+const ProjecaoVendas = lazy(() => import("@/components/vendas/ProjecaoVendas"));
 
 // Tipos
 type Turno = "manha" | "tarde" | "noite";
@@ -550,7 +552,16 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
           </TabsContent>
 
           <TabsContent value="vendas" className="mt-6 space-y-6">
-            <ProjecaoVendas />
+            <Suspense fallback={
+              <div className="flex items-center justify-center p-8">
+                <div className="flex items-center gap-2">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                  <div className="text-lg">Carregando Projeção de Vendas...</div>
+                </div>
+              </div>
+            }>
+              <ProjecaoVendas />
+            </Suspense>
           </TabsContent>
 
           <TabsContent value="entradas" className="mt-6">
