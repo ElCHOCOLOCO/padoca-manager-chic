@@ -122,36 +122,70 @@ function ProjecaoVendas() {
         .select('*')
         .order('codigo');
 
-      if (institutosError) throw institutosError;
-      setInstitutos(institutosData || []);
+      if (institutosError) {
+        console.error('Erro ao carregar institutos:', institutosError);
+        // Se não conseguir carregar institutos, mostrar erro mas continuar
+        toast({ title: "Aviso", description: "Erro ao carregar institutos. Execute o SQL de inserção primeiro." });
+        setInstitutos([]);
+      } else {
+        setInstitutos(institutosData || []);
+        console.log('Institutos carregados:', institutosData?.length || 0);
+      }
 
-      // Carregar matriz de vendas
-      const { data: matrizData, error: matrizError } = await supabase
-        .rpc('obter_matriz_vendas', { p_data_referencia: dataReferencia });
+      // Carregar matriz de vendas (pode falhar se a função não existir ainda)
+      try {
+        const { data: matrizData, error: matrizError } = await supabase
+          .rpc('obter_matriz_vendas', { p_data_referencia: dataReferencia });
 
-      if (matrizError) throw matrizError;
-      setMatrizVendas(matrizData || []);
+        if (matrizError) {
+          console.warn('Função obter_matriz_vendas não disponível:', matrizError);
+          setMatrizVendas([]);
+        } else {
+          setMatrizVendas(matrizData || []);
+        }
+      } catch (error) {
+        console.warn('Erro ao carregar matriz de vendas:', error);
+        setMatrizVendas([]);
+      }
 
-      // Carregar análise de oferta e demanda
-      const { data: analiseData, error: analiseError } = await supabase
-        .from('analise_oferta_demanda_view')
-        .select('*')
-        .eq('data_referencia', dataReferencia);
+      // Carregar análise de oferta e demanda (pode falhar se a view não existir)
+      try {
+        const { data: analiseData, error: analiseError } = await supabase
+          .from('analise_oferta_demanda_view')
+          .select('*')
+          .eq('data_referencia', dataReferencia);
 
-      if (analiseError) throw analiseError;
-      setAnaliseOfertaDemanda(analiseData || []);
+        if (analiseError) {
+          console.warn('View analise_oferta_demanda_view não disponível:', analiseError);
+          setAnaliseOfertaDemanda([]);
+        } else {
+          setAnaliseOfertaDemanda(analiseData || []);
+        }
+      } catch (error) {
+        console.warn('Erro ao carregar análise de oferta e demanda:', error);
+        setAnaliseOfertaDemanda([]);
+      }
 
-      // Carregar metas
-      const { data: metasData, error: metasError } = await supabase
-        .from('metas_vendas')
-        .select('*')
-        .order('tipo_periodo, periodo_inicio');
+      // Carregar metas (pode falhar se a tabela não existir)
+      try {
+        const { data: metasData, error: metasError } = await supabase
+          .from('metas_vendas')
+          .select('*')
+          .order('tipo_periodo, periodo_inicio');
 
-      if (metasError) throw metasError;
-      setMetas(metasData || []);
+        if (metasError) {
+          console.warn('Tabela metas_vendas não disponível:', metasError);
+          setMetas([]);
+        } else {
+          setMetas(metasData || []);
+        }
+      } catch (error) {
+        console.warn('Erro ao carregar metas:', error);
+        setMetas([]);
+      }
 
     } catch (error: any) {
-      console.error('Erro ao carregar dados:', error);
+      console.error('Erro geral ao carregar dados:', error);
       toast({ title: "Erro ao carregar dados", description: error.message });
     } finally {
       setLoading(false);
@@ -160,16 +194,68 @@ function ProjecaoVendas() {
 
   const handleUpdateProjecao = async (institutoId: string, dia: string, turno: string, projecao: number, vendasReais: number) => {
     try {
-      const { error } = await supabase.rpc('atualizar_projecao_vendas', {
-        p_instituto_id: institutoId,
-        p_dia: dia,
-        p_turno: turno,
-        p_projecao: projecao,
-        p_vendas_reais: vendasReais,
-        p_data_referencia: dataReferencia
-      });
+      // Primeiro, tentar usar a função RPC
+      try {
+        const { error } = await supabase.rpc('atualizar_projecao_vendas', {
+          p_instituto_id: institutoId,
+          p_dia: dia,
+          p_turno: turno,
+          p_projecao: projecao,
+          p_vendas_reais: vendasReais,
+          p_data_referencia: dataReferencia
+        });
 
-      if (error) throw error;
+        if (error) throw error;
+
+        toast({ title: "Projeção atualizada", description: "Dados salvos com sucesso!" });
+        setEditingCell(null);
+        loadData(); // Recarregar dados
+        return;
+      } catch (rpcError: any) {
+        console.warn('Função RPC não disponível, tentando inserção direta:', rpcError);
+      }
+
+      // Fallback: inserção/atualização direta na tabela
+      const { data: existingData, error: selectError } = await supabase
+        .from('projecoes_vendas')
+        .select('id')
+        .eq('instituto_id', institutoId)
+        .eq('dia', dia)
+        .eq('turno', turno)
+        .eq('data_referencia', dataReferencia)
+        .single();
+
+      if (selectError && selectError.code !== 'PGRST116') { // PGRST116 = no rows returned
+        throw selectError;
+      }
+
+      if (existingData) {
+        // Atualizar registro existente
+        const { error: updateError } = await supabase
+          .from('projecoes_vendas')
+          .update({
+            projecao_quantidade: projecao,
+            vendas_reais: vendasReais,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingData.id);
+
+        if (updateError) throw updateError;
+      } else {
+        // Inserir novo registro
+        const { error: insertError } = await supabase
+          .from('projecoes_vendas')
+          .insert([{
+            instituto_id: institutoId,
+            dia: dia,
+            turno: turno,
+            projecao_quantidade: projecao,
+            vendas_reais: vendasReais,
+            data_referencia: dataReferencia
+          }]);
+
+        if (insertError) throw insertError;
+      }
 
       toast({ title: "Projeção atualizada", description: "Dados salvos com sucesso!" });
       setEditingCell(null);
@@ -286,7 +372,7 @@ function ProjecaoVendas() {
             <CardHeader>
               <CardTitle>Matriz Cartesiana de Vendas</CardTitle>
               <p className="text-sm text-muted-foreground">
-                Edite as projeções e vendas reais clicando nas células
+                Edite as projeções e vendas reais clicando nas células. Total de {institutos.length} institutos.
               </p>
             </CardHeader>
             <CardContent>
@@ -294,22 +380,26 @@ function ProjecaoVendas() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-48">Instituto</TableHead>
+                      <TableHead className="w-56 bg-muted/50 sticky left-0 z-10">
+                        <div className="font-bold text-center">Instituto</div>
+                      </TableHead>
                       {diasSemana.map(dia => (
-                        <TableHead key={dia} className="text-center">
-                          {labelDia[dia]}
+                        <TableHead key={dia} className="text-center min-w-32 bg-muted/30">
+                          <div className="font-medium">{labelDia[dia]}</div>
                         </TableHead>
                       ))}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {institutos.map(instituto => (
-                      <TableRow key={instituto.id}>
-                        <TableCell className="font-medium">
-                          <div>
-                            <div className="font-bold">{instituto.codigo}</div>
-                            <div className="text-sm text-muted-foreground">{instituto.nome}</div>
-                            <Badge variant="outline">{labelTurno[instituto.turno]}</Badge>
+                      <TableRow key={instituto.id} className="hover:bg-muted/30">
+                        <TableCell className="font-medium bg-muted/20 sticky left-0 z-10 border-r">
+                          <div className="space-y-1">
+                            <div className="font-bold text-lg">{instituto.codigo}</div>
+                            <div className="text-sm text-muted-foreground leading-tight">{instituto.nome}</div>
+                            <Badge variant="outline" className="text-xs">
+                              {labelTurno[instituto.turno]}
+                            </Badge>
                           </div>
                         </TableCell>
                         {diasSemana.map(dia => {
@@ -317,25 +407,27 @@ function ProjecaoVendas() {
                           const isEditing = editingCell?.instituto === instituto.codigo && editingCell?.dia === dia;
 
                           return (
-                            <TableCell key={dia} className="text-center">
+                            <TableCell key={dia} className="text-center p-2 min-w-32">
                               {isEditing ? (
-                                <div className="space-y-2">
+                                <div className="space-y-2 p-2 border rounded bg-background">
                                   <div>
-                                    <Label className="text-xs">Projeção:</Label>
+                                    <Label className="text-xs font-medium">Projeção:</Label>
                                     <Input
                                       type="number"
                                       value={editProjecao}
                                       onChange={(e) => setEditProjecao(Number(e.target.value))}
                                       className="h-8 text-xs"
+                                      placeholder="0"
                                     />
                                   </div>
                                   <div>
-                                    <Label className="text-xs">Vendas Reais:</Label>
+                                    <Label className="text-xs font-medium">Vendas Reais:</Label>
                                     <Input
                                       type="number"
                                       value={editVendasReais}
                                       onChange={(e) => setEditVendasReais(Number(e.target.value))}
                                       className="h-8 text-xs"
+                                      placeholder="0"
                                     />
                                   </div>
                                   <div className="flex gap-1">
@@ -348,7 +440,7 @@ function ProjecaoVendas() {
                                         editProjecao,
                                         editVendasReais
                                       )}
-                                      className="text-xs px-2"
+                                      className="text-xs px-2 h-6"
                                     >
                                       ✓
                                     </Button>
@@ -356,7 +448,7 @@ function ProjecaoVendas() {
                                       size="sm"
                                       variant="outline"
                                       onClick={() => setEditingCell(null)}
-                                      className="text-xs px-2"
+                                      className="text-xs px-2 h-6"
                                     >
                                       ×
                                     </Button>
@@ -364,27 +456,34 @@ function ProjecaoVendas() {
                                 </div>
                               ) : (
                                 <div 
-                                  className="cursor-pointer hover:bg-muted p-2 rounded"
+                                  className="cursor-pointer hover:bg-muted p-3 rounded border border-transparent hover:border-border transition-all min-h-20 flex flex-col justify-center"
                                   onClick={() => {
                                     setEditingCell({ instituto: instituto.codigo, dia });
                                     setEditProjecao(cell?.projecao || 0);
                                     setEditVendasReais(cell?.vendas_reais || 0);
                                   }}
                                 >
-                                  <div className="text-sm font-medium">
-                                    Proj: {cell?.projecao || 0}
+                                  <div className="space-y-1">
+                                    <div className="text-sm font-medium text-blue-600">
+                                      Proj: {cell?.projecao || 0}
+                                    </div>
+                                    <div className="text-sm font-medium text-green-600">
+                                      Real: {cell?.vendas_reais || 0}
+                                    </div>
+                                    {cell && cell.projecao > 0 && (
+                                      <Badge 
+                                        variant="outline" 
+                                        className={`text-xs ${getStatusColor(cell.percentual_acerto)}`}
+                                      >
+                                        {cell.percentual_acerto.toFixed(1)}%
+                                      </Badge>
+                                    )}
+                                    {!cell && (
+                                      <div className="text-xs text-muted-foreground">
+                                        Clique para editar
+                                      </div>
+                                    )}
                                   </div>
-                                  <div className="text-sm">
-                                    Real: {cell?.vendas_reais || 0}
-                                  </div>
-                                  {cell && (
-                                    <Badge 
-                                      variant="outline" 
-                                      className={`text-xs ${getStatusColor(cell.percentual_acerto)}`}
-                                    >
-                                      {cell.percentual_acerto.toFixed(1)}%
-                                    </Badge>
-                                  )}
                                 </div>
                               )}
                             </TableCell>
