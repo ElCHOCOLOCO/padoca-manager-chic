@@ -91,23 +91,37 @@ function InsumosTabela14() {
   const loadRecipeItems = async (recipeId: string) => {
     const recipe = recipes.find((r) => r.id === recipeId);
     if (recipe) setUnidades(recipe.units_per_batch ?? "");
-    const { data, error } = await supabase
+    
+    // Tentar carregar com as novas colunas primeiro
+    let { data, error } = await supabase
       .from("insumo_recipe_items")
       .select("idx, name, cost, unit, quantity")
       .eq("recipe_id", recipeId)
       .order("idx", { ascending: true });
+    
+    // Se falhar, tentar sem as novas colunas (compatibilidade)
     if (error) {
-      toast({ title: "Erro ao carregar itens", description: error.message });
-      return;
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from("insumo_recipe_items")
+        .select("idx, name, cost")
+        .eq("recipe_id", recipeId)
+        .order("idx", { ascending: true });
+      
+      if (fallbackError) {
+        toast({ title: "Erro ao carregar itens", description: fallbackError.message });
+        return;
+      }
+      data = fallbackData;
     }
+    
     const mapped = initialRows.map((base) => {
       const found = (data as any[])?.find((d) => d.idx === base.id);
       return {
         id: base.id,
         nome: found?.name ?? base.nome,
         preco_unitario: typeof found?.cost === "number" ? Number(found.cost) : 0,
-        unidade: found?.unit ?? "kg",
-        quantidade_receita: typeof found?.quantity === "number" ? Number(found.quantity) : 0,
+        unidade: found?.unit ?? "kg" as Unidade,
+        quantidade_receita: typeof found?.quantity === "number" ? Number(found.quantity) : 1,
         valor_total: 0,
       } as Row;
     });
@@ -121,7 +135,9 @@ function InsumosTabela14() {
     }
     itemDebounceRef.current[idx] = window.setTimeout(async () => {
       if (!selectedRecipeId) return;
-      const { error } = await supabase
+      
+      // Tentar salvar com as novas colunas primeiro
+      let { error } = await supabase
         .from("insumo_recipe_items")
         .upsert({ 
           recipe_id: selectedRecipeId, 
@@ -131,8 +147,21 @@ function InsumosTabela14() {
           unit: unidade,
           quantity: quantidade_receita
         }, { onConflict: "recipe_id,idx" });
+      
+      // Se falhar, tentar sem as novas colunas (compatibilidade)
       if (error) {
-        toast({ title: "Erro ao salvar item", description: error.message });
+        const { error: fallbackError } = await supabase
+          .from("insumo_recipe_items")
+          .upsert({ 
+            recipe_id: selectedRecipeId, 
+            idx, 
+            name: nome, 
+            cost: preco_unitario
+          }, { onConflict: "recipe_id,idx" });
+        
+        if (fallbackError) {
+          toast({ title: "Erro ao salvar item", description: fallbackError.message });
+        }
       }
     }, 400);
   };
@@ -220,12 +249,28 @@ function InsumosTabela14() {
           name: (current?.nome ?? base.nome) || base.nome,
           cost: typeof current?.preco_unitario === "number" ? current!.preco_unitario : 0,
           unit: current?.unidade ?? "kg",
-          quantity: typeof current?.quantidade_receita === "number" ? current!.quantidade_receita : 0,
+          quantity: typeof current?.quantidade_receita === "number" ? current!.quantidade_receita : 1,
         };
       });
 
-      const { error: itemsErr } = await supabase.from("insumo_recipe_items").upsert(itemsPayload, { onConflict: "recipe_id,idx" });
-      if (itemsErr) throw itemsErr;
+      // Tentar salvar com as novas colunas primeiro
+      let { error: itemsErr } = await supabase.from("insumo_recipe_items").upsert(itemsPayload, { onConflict: "recipe_id,idx" });
+      
+      // Se falhar, tentar sem as novas colunas (compatibilidade)
+      if (itemsErr) {
+        const fallbackPayload = initialRows.map((base) => {
+          const current = rows.find((r) => r.id === base.id) as Row | undefined;
+          return {
+            recipe_id: recipeId,
+            idx: base.id,
+            name: (current?.nome ?? base.nome) || base.nome,
+            cost: typeof current?.preco_unitario === "number" ? current!.preco_unitario : 0,
+          };
+        });
+        
+        const { error: fallbackErr } = await supabase.from("insumo_recipe_items").upsert(fallbackPayload, { onConflict: "recipe_id,idx" });
+        if (fallbackErr) throw fallbackErr;
+      }
 
       setRecipes((prev) => [{ ...(recipeInsert as any), id: recipeId }, ...prev]);
       setSelectedRecipeId(recipeId);
@@ -348,6 +393,9 @@ function InsumosTabela14() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Salvar como produto</DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              Salve esta receita como um produto para reutilizar posteriormente.
+            </p>
           </DialogHeader>
           <div className="space-y-3">
             <Label htmlFor="productName">Nome do produto</Label>
