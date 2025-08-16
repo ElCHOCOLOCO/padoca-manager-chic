@@ -5,18 +5,31 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { DEFAULT_USER_ID } from "@/config";
 
- type Row = { id: number; nome: string; custo: number | "" };
+type Unidade = "kg" | "ml" | "g" | "l" | "unidade";
 
- type Recipe = { id: string; name: string; units_per_batch: number; created_at: string };
+type Row = { 
+  id: number; 
+  nome: string; 
+  preco_unitario: number | ""; 
+  unidade: Unidade;
+  quantidade_receita: number | "";
+  valor_total: number;
+};
+
+type Recipe = { id: string; name: string; units_per_batch: number; created_at: string };
 
 const initialRows: Row[] = Array.from({ length: 14 }, (_, i) => ({
   id: i + 1,
   nome: `Componente ${i + 1}`,
-  custo: 0,
+  preco_unitario: 0,
+  unidade: "kg" as Unidade,
+  quantidade_receita: 0,
+  valor_total: 0,
 }));
 
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
@@ -37,9 +50,19 @@ function InsumosTabela14() {
   const itemDebounceRef = useRef<Record<number, number>>({});
   const unidadesDebounceRef = useRef<number | null>(null);
 
+  // Calcular valor total para cada linha
+  const rowsWithTotal = useMemo(() => {
+    return rows.map(row => ({
+      ...row,
+      valor_total: (typeof row.preco_unitario === "number" && typeof row.quantidade_receita === "number") 
+        ? row.preco_unitario * row.quantidade_receita 
+        : 0
+    }));
+  }, [rows]);
+
   const total = useMemo(
-    () => rows.reduce((s, r) => s + (typeof r.custo === "number" ? r.custo : 0), 0),
-    [rows]
+    () => rowsWithTotal.reduce((s, r) => s + r.valor_total, 0),
+    [rowsWithTotal]
   );
 
   const custoPorUnidade = useMemo(() => {
@@ -70,7 +93,7 @@ function InsumosTabela14() {
     if (recipe) setUnidades(recipe.units_per_batch ?? "");
     const { data, error } = await supabase
       .from("insumo_recipe_items")
-      .select("idx, name, cost")
+      .select("idx, name, cost, unit, quantity")
       .eq("recipe_id", recipeId)
       .order("idx", { ascending: true });
     if (error) {
@@ -82,13 +105,16 @@ function InsumosTabela14() {
       return {
         id: base.id,
         nome: found?.name ?? base.nome,
-        custo: typeof found?.cost === "number" ? Number(found.cost) : 0,
+        preco_unitario: typeof found?.cost === "number" ? Number(found.cost) : 0,
+        unidade: found?.unit ?? "kg",
+        quantidade_receita: typeof found?.quantity === "number" ? Number(found.quantity) : 0,
+        valor_total: 0,
       } as Row;
     });
     setRows(mapped);
   };
 
-  const scheduleItemUpsert = (idx: number, nome: string, custo: number) => {
+  const scheduleItemUpsert = (idx: number, nome: string, preco_unitario: number, unidade: Unidade, quantidade_receita: number) => {
     // clear previous
     if (itemDebounceRef.current[idx]) {
       clearTimeout(itemDebounceRef.current[idx]);
@@ -97,7 +123,14 @@ function InsumosTabela14() {
       if (!selectedRecipeId) return;
       const { error } = await supabase
         .from("insumo_recipe_items")
-        .upsert({ recipe_id: selectedRecipeId, idx, name: nome, cost: custo }, { onConflict: "recipe_id,idx" });
+        .upsert({ 
+          recipe_id: selectedRecipeId, 
+          idx, 
+          name: nome, 
+          cost: preco_unitario,
+          unit: unidade,
+          quantity: quantidade_receita
+        }, { onConflict: "recipe_id,idx" });
       if (error) {
         toast({ title: "Erro ao salvar item", description: error.message });
       }
@@ -120,18 +153,41 @@ function InsumosTabela14() {
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, nome: value } : r)));
     if (selectedRecipeId) {
       const row = rows.find((r) => r.id === id);
-      const custoNum = typeof row?.custo === "number" ? row!.custo : 0;
-      scheduleItemUpsert(id, value, custoNum);
+      if (row) {
+        scheduleItemUpsert(id, value, typeof row.preco_unitario === "number" ? row.preco_unitario : 0, row.unidade, typeof row.quantidade_receita === "number" ? row.quantidade_receita : 0);
+      }
     }
   };
 
-  const handleCustoChange = (id: number, value: string) => {
-    const custoNum = value === "" ? 0 : Number(value);
-    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, custo: value === "" ? "" : custoNum } : r)));
+  const handlePrecoChange = (id: number, value: string) => {
+    const precoNum = value === "" ? 0 : Number(value);
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, preco_unitario: value === "" ? "" : precoNum } : r)));
     if (selectedRecipeId) {
       const row = rows.find((r) => r.id === id);
-      const nomeVal = row?.nome ?? `Componente ${id}`;
-      scheduleItemUpsert(id, nomeVal, custoNum);
+      if (row) {
+        scheduleItemUpsert(id, row.nome, precoNum, row.unidade, typeof row.quantidade_receita === "number" ? row.quantidade_receita : 0);
+      }
+    }
+  };
+
+  const handleUnidadeChange = (id: number, value: Unidade) => {
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, unidade: value } : r)));
+    if (selectedRecipeId) {
+      const row = rows.find((r) => r.id === id);
+      if (row) {
+        scheduleItemUpsert(id, row.nome, typeof row.preco_unitario === "number" ? row.preco_unitario : 0, value, typeof row.quantidade_receita === "number" ? row.quantidade_receita : 0);
+      }
+    }
+  };
+
+  const handleQuantidadeChange = (id: number, value: string) => {
+    const quantidadeNum = value === "" ? 0 : Number(value);
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, quantidade_receita: value === "" ? "" : quantidadeNum } : r)));
+    if (selectedRecipeId) {
+      const row = rows.find((r) => r.id === id);
+      if (row) {
+        scheduleItemUpsert(id, row.nome, typeof row.preco_unitario === "number" ? row.preco_unitario : 0, row.unidade, quantidadeNum);
+      }
     }
   };
 
@@ -162,7 +218,9 @@ function InsumosTabela14() {
           recipe_id: recipeId,
           idx: base.id,
           name: (current?.nome ?? base.nome) || base.nome,
-          cost: typeof current?.custo === "number" ? current!.custo : 0,
+          cost: typeof current?.preco_unitario === "number" ? current!.preco_unitario : 0,
+          unit: current?.unidade ?? "kg",
+          quantity: typeof current?.quantidade_receita === "number" ? current!.quantidade_receita : 0,
         };
       });
 
@@ -190,29 +248,59 @@ function InsumosTabela14() {
           <TableRow>
             <TableHead>#</TableHead>
             <TableHead>Componente</TableHead>
-            <TableHead>Custo (R$)</TableHead>
+            <TableHead>Preço Unitário</TableHead>
+            <TableHead>Unidade</TableHead>
+            <TableHead>Qtd. na Receita</TableHead>
+            <TableHead>Valor Total</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {rows.map((r) => (
+          {rowsWithTotal.map((r) => (
             <TableRow key={r.id}>
               <TableCell className="w-10">{r.id}</TableCell>
-              <TableCell className="max-w-[260px]">
+              <TableCell className="max-w-[200px]">
                 <Input
                   value={r.nome}
                   onChange={(e) => handleNomeChange(r.id, e.target.value)}
                   aria-label={`Nome do componente ${r.id}`}
                 />
               </TableCell>
-              <TableCell className="max-w-[160px]">
+              <TableCell className="max-w-[140px]">
                 <Input
                   type="number"
                   step="0.01"
-                  value={r.custo === "" ? "" : r.custo}
-                  onChange={(e) => handleCustoChange(r.id, e.target.value)}
+                  value={r.preco_unitario === "" ? "" : r.preco_unitario}
+                  onChange={(e) => handlePrecoChange(r.id, e.target.value)}
                   placeholder="0,00"
-                  aria-label={`Custo do componente ${r.id}`}
+                  aria-label={`Preço unitário do componente ${r.id}`}
                 />
+              </TableCell>
+              <TableCell className="max-w-[100px]">
+                <Select value={r.unidade} onValueChange={(value: Unidade) => handleUnidadeChange(r.id, value)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="kg">kg</SelectItem>
+                    <SelectItem value="g">g</SelectItem>
+                    <SelectItem value="ml">ml</SelectItem>
+                    <SelectItem value="l">l</SelectItem>
+                    <SelectItem value="unidade">unidade</SelectItem>
+                  </SelectContent>
+                </Select>
+              </TableCell>
+              <TableCell className="max-w-[140px]">
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={r.quantidade_receita === "" ? "" : r.quantidade_receita}
+                  onChange={(e) => handleQuantidadeChange(r.id, e.target.value)}
+                  placeholder="0,00"
+                  aria-label={`Quantidade na receita do componente ${r.id}`}
+                />
+              </TableCell>
+              <TableCell className="max-w-[140px] font-medium">
+                {brl.format(r.valor_total)}
               </TableCell>
             </TableRow>
           ))}
@@ -248,7 +336,7 @@ function InsumosTabela14() {
       </div>
 
       <div className="text-xs text-muted-foreground">
-        Edite até 14 componentes acima e informe quantas unidades esse lote produz para calcular o custo por unidade.
+        Edite até 14 componentes acima. Para cada item, informe o preço unitário, unidade de medida e quantidade utilizada na receita para calcular o valor total.
       </div>
 
       <div className="flex gap-2">
