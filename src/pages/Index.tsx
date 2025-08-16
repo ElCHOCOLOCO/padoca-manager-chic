@@ -19,6 +19,7 @@ import EntradasPanel from "@/components/finance/EntradasPanel";
 import IntegrationTab from "@/components/integration/IntegrationTab";
 import ThemeToggle from "@/components/ThemeToggle";
 import { supabase as supabaseClient } from "@/integrations/supabase/client";
+import React from "react";
 
 // Tipos
 type Turno = "manha" | "tarde" | "noite";
@@ -48,8 +49,9 @@ const [metaLucroLiquido, setMetaLucroLiquido] = useState<number | undefined>(und
 const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | undefined>(undefined);
 
 // Estados para edição
-const [editingCA, setEditingCA] = useState<string | null>(null);
-const [editingEscala, setEditingEscala] = useState<string | null>(null);
+  const [editingCA, setEditingCA] = useState<string | null>(null);
+  const [editingEscala, setEditingEscala] = useState<string | null>(null);
+  const [activeView, setActiveView] = useState<'camaradas' | 'institutos' | 'turnos' | 'estatisticas'>('camaradas');
 
   const supabase: any = supabaseClient as any;
 
@@ -918,6 +920,268 @@ const [editingEscala, setEditingEscala] = useState<string | null>(null);
                   </div>
                 </section>
               </CardContent>
+            </Card>
+
+            <Card className="animate-fade-in">
+              <CardHeader>
+                <CardTitle>Escala — Visualização Compacta</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Visualização completa da escala em formato de matriz para até 30 camaradas. Use as abas para alternar entre diferentes visualizações.
+                </p>
+                <div className="flex gap-2 mt-4">
+                  <Button 
+                    variant={activeView === 'camaradas' ? 'default' : 'outline'} 
+                    size="sm"
+                    onClick={() => setActiveView('camaradas')}
+                  >
+                    Por Camarada
+                  </Button>
+                  <Button 
+                    variant={activeView === 'institutos' ? 'default' : 'outline'} 
+                    size="sm"
+                    onClick={() => setActiveView('institutos')}
+                  >
+                    Por Instituto
+                  </Button>
+                  <Button 
+                    variant={activeView === 'turnos' ? 'default' : 'outline'} 
+                    size="sm"
+                    onClick={() => setActiveView('turnos')}
+                  >
+                    Por Turno
+                  </Button>
+                  <Button 
+                    variant={activeView === 'estatisticas' ? 'default' : 'outline'} 
+                    size="sm"
+                    onClick={() => setActiveView('estatisticas')}
+                  >
+                    Estatísticas
+                  </Button>
+                </div>
+              </CardHeader>
+                              <CardContent>
+                  {activeView === 'camaradas' && (
+                    <div className="overflow-x-auto">
+                      <div className="min-w-max">
+                        <div className="grid grid-cols-8 gap-1 text-xs">
+                          {/* Header */}
+                          <div className="font-medium p-2 bg-muted rounded">Camarada</div>
+                          {dias.map(d => (
+                            <div key={d} className="font-medium p-2 bg-muted rounded text-center">
+                              {labelDia[d]}
+                            </div>
+                          ))}
+                          <div className="font-medium p-2 bg-muted rounded text-center">Total</div>
+                          
+                          {/* Linhas dos camaradas */}
+                          {camaradas.slice(0, 30).map((c) => {
+                            const escalasCamarada = escala.filter(e => e.camarada_id === c.id);
+                            const totalEscalas = escalasCamarada.length;
+                            
+                            return (
+                              <React.Fragment key={c.id}>
+                                <div className="p-2 border-b text-xs font-medium truncate" title={c.nome}>
+                                  {c.nome}
+                                </div>
+                                {dias.map((d) => {
+                                  const escalasDia = escalasCamarada.filter(e => e.dia === d);
+                                  const turnos = ['manha', 'tarde', 'noite'] as Turno[];
+                                  
+                                  return (
+                                    <div key={d} className="p-1 border-b text-center">
+                                      <div className="flex flex-col gap-0.5">
+                                        {turnos.map((t) => {
+                                          const escalaTurno = escalasDia.find(e => e.turno === t);
+                                          if (!escalaTurno) return null;
+                                          
+                                          const instituto = institutos.find(i => i.id === escalaTurno.instituto_id);
+                                          return (
+                                            <div 
+                                              key={t} 
+                                              className="text-xs px-1 py-0.5 bg-blue-100 text-blue-800 rounded"
+                                              title={`${instituto?.nome} - ${labelTurno[t]}`}
+                                            >
+                                              {instituto?.nome?.charAt(0) || '?'}
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                                <div className="p-2 border-b text-center font-medium text-sm">
+                                  {totalEscalas}
+                                </div>
+                              </React.Fragment>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeView === 'institutos' && (
+                    <div className="overflow-x-auto">
+                      <div className="min-w-max">
+                        <div className="grid grid-cols-8 gap-1 text-xs">
+                          {/* Header */}
+                          <div className="font-medium p-2 bg-muted rounded">Instituto</div>
+                          {dias.map(d => (
+                            <div key={d} className="font-medium p-2 bg-muted rounded text-center">
+                              {labelDia[d]}
+                            </div>
+                          ))}
+                          <div className="font-medium p-2 bg-muted rounded text-center">Total</div>
+                          
+                          {/* Linhas dos institutos */}
+                          {institutos.map((i) => {
+                            const escalasInstituto = escala.filter(e => e.instituto_id === i.id);
+                            const totalEscalas = escalasInstituto.length;
+                            
+                            return (
+                              <React.Fragment key={i.id}>
+                                <div className="p-2 border-b text-xs font-medium truncate" title={i.nome}>
+                                  {i.nome}
+                                </div>
+                                {dias.map((d) => {
+                                  const escalasDia = escalasInstituto.filter(e => e.dia === d);
+                                  const turnos = ['manha', 'tarde', 'noite'] as Turno[];
+                                  
+                                  return (
+                                    <div key={d} className="p-1 border-b text-center">
+                                      <div className="flex flex-col gap-0.5">
+                                        {turnos.map((t) => {
+                                          const escalaTurno = escalasDia.find(e => e.turno === t);
+                                          if (!escalaTurno) return null;
+                                          
+                                          const camarada = camaradas.find(c => c.id === escalaTurno.camarada_id);
+                                          return (
+                                            <div 
+                                              key={t} 
+                                              className="text-xs px-1 py-0.5 bg-green-100 text-green-800 rounded"
+                                              title={`${camarada?.nome} - ${labelTurno[t]}`}
+                                            >
+                                              {camarada?.nome?.charAt(0) || '?'}
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                                <div className="p-2 border-b text-center font-medium text-sm">
+                                  {totalEscalas}
+                                </div>
+                              </React.Fragment>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeView === 'turnos' && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {(['manha', 'tarde', 'noite'] as Turno[]).map((turno) => (
+                        <div key={turno} className="border rounded-lg p-4">
+                          <h4 className="font-medium mb-3 text-center">{labelTurno[turno]}</h4>
+                          <div className="space-y-2">
+                            {dias.map((dia) => {
+                              const escalasDiaTurno = escala.filter(e => e.dia === dia && e.turno === turno);
+                              
+                              return (
+                                <div key={dia} className="border rounded p-2">
+                                  <div className="text-xs font-medium mb-1">{labelDia[dia]}</div>
+                                  <div className="flex flex-wrap gap-1">
+                                    {escalasDiaTurno.map((e) => {
+                                      const camarada = camaradas.find(c => c.id === e.camarada_id);
+                                      const instituto = institutos.find(i => i.id === e.instituto_id);
+                                      
+                                      return (
+                                        <div 
+                                          key={e.id}
+                                          className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded-full"
+                                          title={`${camarada?.nome} - ${instituto?.nome}`}
+                                        >
+                                          {camarada?.nome?.charAt(0) || '?'} → {instituto?.nome?.charAt(0) || '?'}
+                                        </div>
+                                      );
+                                    })}
+                                    {escalasDiaTurno.length === 0 && (
+                                      <span className="text-xs text-muted-foreground">Vazio</span>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {activeView === 'estatisticas' && (
+                    <div className="space-y-6">
+                      {/* Estatísticas Rápidas */}
+                      <section>
+                        <h3 className="font-medium mb-4">Estatísticas Rápidas</h3>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                          <div className="border rounded p-3 text-center">
+                            <div className="text-2xl font-bold text-blue-600">{camaradas.length}</div>
+                            <div className="text-xs text-muted-foreground">Camaradas</div>
+                          </div>
+                          <div className="border rounded p-3 text-center">
+                            <div className="text-2xl font-bold text-green-600">{institutos.length}</div>
+                            <div className="text-xs text-muted-foreground">Institutos</div>
+                          </div>
+                          <div className="border rounded p-3 text-center">
+                            <div className="text-2xl font-bold text-purple-600">{escala.length}</div>
+                            <div className="text-xs text-muted-foreground">Atribuições</div>
+                          </div>
+                          <div className="border rounded p-3 text-center">
+                            <div className="text-2xl font-bold text-orange-600">
+                              {escala.length > 0 ? Math.round(escala.length / (camaradas.length || 1)) : 0}
+                            </div>
+                            <div className="text-xs text-muted-foreground">Média/Camarada</div>
+                          </div>
+                        </div>
+                      </section>
+
+                      {/* Camaradas Mais Ativos */}
+                      <section>
+                        <h3 className="font-medium mb-4">Camaradas Mais Ativos</h3>
+                        <div className="space-y-2">
+                          {camaradas
+                            .map(c => ({
+                              ...c,
+                              totalEscalas: escala.filter(e => e.camarada_id === c.id).length
+                            }))
+                            .sort((a, b) => b.totalEscalas - a.totalEscalas)
+                            .slice(0, 10)
+                            .map((c, index) => (
+                              <div key={c.id} className="flex items-center justify-between p-2 border rounded">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-6 h-6 bg-blue-100 text-blue-800 rounded-full flex items-center justify-center text-xs font-medium">
+                                    {index + 1}
+                                  </div>
+                                  <div>
+                                    <div className="font-medium text-sm">{c.nome}</div>
+                                    <div className="text-xs text-muted-foreground">{c.curso}</div>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <div className="font-medium text-sm">{c.totalEscalas} escalas</div>
+                                  <div className="text-xs text-muted-foreground">
+                                    {c.totalEscalas > 0 ? Math.round((c.totalEscalas / escala.length) * 100) : 0}% do total
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                        </div>
+                      </section>
+                    </div>
+                  )}
+                </CardContent>
             </Card>
           </TabsContent>
 
