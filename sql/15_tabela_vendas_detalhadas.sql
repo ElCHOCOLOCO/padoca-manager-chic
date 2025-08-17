@@ -1,5 +1,5 @@
 -- =====================================================
--- TABELA DE VENDAS DETALHADAS
+-- TABELA DE VENDAS DETALHADAS - INTEGRAÇÃO MARX VENDAS
 -- =====================================================
 
 -- 1. TABELA DE VENDAS DETALHADAS
