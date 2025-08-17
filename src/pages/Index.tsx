@@ -22,7 +22,7 @@ import { supabase as supabaseClient } from "@/integrations/supabase/client";
 import React, { Suspense, lazy } from "react";
 
 // Lazy loading para componentes pesados
-const ProjecaoVendas = lazy(() => import("@/components/vendas/ProjecaoVendas"));
+const ProjecaoVendas = lazy(() => import("@/components/vendas/ProjecaoVendasDebug"));
 
 // Tipos
 type Turno = "manha" | "tarde" | "noite";
