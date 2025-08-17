@@ -57,13 +57,9 @@ function IntegracaoVendas() {
   const [vendasDetalhadas, setVendasDetalhadas] = useState<VendaDetalhada[]>([]);
   const [resumoVendas, setResumoVendas] = useState<ResumoVendas | null>(null);
 
-  // Estados para envio manual
-  const [paes, setPaes] = useState<number>(0);
-  const [salgados, setSalgados] = useState<number>(0);
-  const [chocolates, setChocolates] = useState<number>(0);
-  const [refrigerantes, setRefrigerantes] = useState<number>(0);
-  const [lucroDia, setLucroDia] = useState<number>(0);
-  const [observacoes, setObservacoes] = useState<string>('');
+  // Estados para status de conexão
+  const [statusConexao, setStatusConexao] = useState<'conectado' | 'desconectado' | 'conectando'>('desconectado');
+  const [ultimaSincronizacao, setUltimaSincronizacao] = useState<string>('');
 
   // Carregar dados de vendas detalhadas
   const loadVendasData = useCallback(async () => {
@@ -120,74 +116,44 @@ function IntegracaoVendas() {
     loadVendasData();
   }, [loadVendasData]);
 
-  // Enviar vendas detalhadas
-  const enviarVendasDetalhadas = async () => {
-    const totalItens = paes + salgados + chocolates + refrigerantes;
-    if (totalItens <= 0) {
-      toast({ 
-        title: "Erro", 
-        description: "Digite pelo menos um item vendido",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setLoadingSync(true);
+  // Testar conexão com Marx Vendas
+  const testarConexaoMarxVendas = async () => {
+    setStatusConexao('conectando');
     try {
-      console.log("📤 IntegracaoVendas: Enviando vendas detalhadas:", {
-        paes, salgados, chocolates, refrigerantes, lucroDia
-      });
+      console.log("🔍 IntegracaoVendas: Testando conexão com Marx Vendas");
       
-      const { data, error } = await supabase
-        .from('vendas_detalhadas')
-        .insert([{
-          data: dataSelecionada,
-          paes: paes,
-          salgados: salgados,
-          chocolates: chocolates,
-          refrigerantes: refrigerantes,
-          lucro_dia: lucroDia,
-          total_vendas: lucroDia, // Assumindo que lucro_dia é o total de vendas
-          observacoes: observacoes || 'Vendas enviadas manualmente'
-        }]);
+      // Testar se conseguimos acessar os dados do Marx Vendas
+      const { data: vendasMarxData, error: vendasMarxError } = await supabase
+        .from('projecoes_vendas')
+        .select('count')
+        .limit(1);
 
-      if (error) {
-        throw error;
+      if (vendasMarxError) {
+        throw vendasMarxError;
       }
 
+      setStatusConexao('conectado');
       toast({ 
-        title: "Sucesso!", 
-        description: `Vendas detalhadas enviadas: ${totalItens} itens, R$ ${lucroDia.toFixed(2)}` 
+        title: "Conexão OK!", 
+        description: "Marx Vendas está conectado e acessível" 
       });
-
-      // Limpar formulário
-      setPaes(0);
-      setSalgados(0);
-      setChocolates(0);
-      setRefrigerantes(0);
-      setLucroDia(0);
-      setObservacoes('');
-      
-      // Recarregar dados
-      loadVendasData();
 
     } catch (error: any) {
-      console.error('❌ IntegracaoVendas: Erro ao enviar vendas:', error);
+      console.error('❌ IntegracaoVendas: Erro na conexão:', error);
+      setStatusConexao('desconectado');
       toast({ 
-        title: "Erro ao enviar vendas", 
-        description: error.message,
+        title: "Erro de Conexão", 
+        description: "Não foi possível conectar com Marx Vendas",
         variant: "destructive"
       });
-    } finally {
-      setLoadingSync(false);
     }
   };
 
-  // Sincronizar automaticamente do Marx Vendas
-  const sincronizarMarxVendas = async () => {
+  // Receber dados do Marx Vendas
+  const receberDadosMarxVendas = async () => {
     setLoadingSync(true);
     try {
-      console.log("🔄 IntegracaoVendas: Iniciando sincronização do Marx Vendas");
+      console.log("📥 IntegracaoVendas: Recebendo dados do Marx Vendas");
       
       // Buscar vendas do Marx Vendas da data selecionada
       const { data: vendasMarxData, error: vendasMarxError } = await supabase
@@ -202,7 +168,7 @@ function IntegracaoVendas() {
         throw vendasMarxError;
       }
 
-      // Calcular totais (simulação - você pode ajustar conforme necessário)
+      // Calcular totais
       const totalVendas = (vendasMarxData || []).reduce((total, item) => total + (item.vendas_reais || 0), 0);
       
       // Distribuir vendas por tipo de produto (simulação)
@@ -214,11 +180,11 @@ function IntegracaoVendas() {
       // Calcular lucro estimado (R$ 2 por item em média)
       const lucroEstimado = totalVendas * 2;
 
-      console.log("📊 IntegracaoVendas: Dados calculados do Marx Vendas:", {
+      console.log("📊 IntegracaoVendas: Dados recebidos do Marx Vendas:", {
         totalVendas, paesVendidos, salgadosVendidos, chocolatesVendidos, refrigerantesVendidos, lucroEstimado
       });
 
-      // Enviar para tabela de vendas detalhadas
+      // Salvar dados recebidos
       const { error: integracaoError } = await supabase
         .from('vendas_detalhadas')
         .insert([{
@@ -229,25 +195,26 @@ function IntegracaoVendas() {
           refrigerantes: refrigerantesVendidos,
           lucro_dia: lucroEstimado,
           total_vendas: totalVendas,
-          observacoes: `Sincronização automática do Marx Vendas - ${vendasMarxData?.length || 0} registros processados`
+          observacoes: `Dados recebidos do Marx Vendas - ${vendasMarxData?.length || 0} registros`
         }]);
 
       if (integracaoError) {
         throw integracaoError;
       }
 
+      setUltimaSincronizacao(new Date().toLocaleString('pt-BR'));
       toast({ 
-        title: "Sincronização Concluída!", 
-        description: `Marx Vendas sincronizado: ${totalVendas} vendas totais, R$ ${lucroEstimado.toFixed(2)} lucro` 
+        title: "Dados Recebidos!", 
+        description: `Marx Vendas: ${totalVendas} vendas totais, R$ ${lucroEstimado.toFixed(2)} lucro` 
       });
 
       // Recarregar dados
       loadVendasData();
 
     } catch (error: any) {
-      console.error('❌ IntegracaoVendas: Erro na sincronização:', error);
+      console.error('❌ IntegracaoVendas: Erro ao receber dados:', error);
       toast({ 
-        title: "Erro na sincronização", 
+        title: "Erro ao receber dados", 
         description: error.message,
         variant: "destructive"
       });
@@ -259,7 +226,7 @@ function IntegracaoVendas() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Integração de Vendas Detalhadas</h1>
+        <h1 className="text-3xl font-bold">Integração Marx Vendas</h1>
         <div className="flex items-center gap-4">
           <Label htmlFor="data-integracao">Data:</Label>
           <Input
@@ -291,138 +258,62 @@ function IntegracaoVendas() {
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Painel de Envio */}
+          {/* Painel de Conexão */}
           <div className="space-y-4">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Upload className="h-5 w-5" />
-                  Enviar Vendas Detalhadas
+                  <Database className="h-5 w-5" />
+                  Status da Conexão
                 </CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  Envie os dados detalhados de vendas do dia
+                  Status da conexão com Marx Vendas
                 </p>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="paes" className="flex items-center gap-2">
-                      <Circle className="h-4 w-4" />
-                      Pães
-                    </Label>
-                    <Input
-                      id="paes"
-                      type="number"
-                      value={paes}
-                      onChange={(e) => setPaes(Number(e.target.value))}
-                      placeholder="0"
-                      min="0"
-                    />
+                <div className="flex items-center justify-between p-3 border rounded">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-3 h-3 rounded-full ${
+                      statusConexao === 'conectado' ? 'bg-green-500' : 
+                      statusConexao === 'conectando' ? 'bg-yellow-500' : 'bg-red-500'
+                    }`}></div>
+                    <span className="font-medium">
+                      {statusConexao === 'conectado' ? 'Conectado' : 
+                       statusConexao === 'conectando' ? 'Conectando...' : 'Desconectado'}
+                    </span>
                   </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="salgados" className="flex items-center gap-2">
-                      <Square className="h-4 w-4" />
-                      Salgados
-                    </Label>
-                    <Input
-                      id="salgados"
-                      type="number"
-                      value={salgados}
-                      onChange={(e) => setSalgados(Number(e.target.value))}
-                      placeholder="0"
-                      min="0"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="chocolates" className="flex items-center gap-2">
-                      <Star className="h-4 w-4" />
-                      Chocolates
-                    </Label>
-                    <Input
-                      id="chocolates"
-                      type="number"
-                      value={chocolates}
-                      onChange={(e) => setChocolates(Number(e.target.value))}
-                      placeholder="0"
-                      min="0"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="refrigerantes" className="flex items-center gap-2">
-                      <TrendingUp className="h-4 w-4" />
-                      Refrigerantes
-                    </Label>
-                    <Input
-                      id="refrigerantes"
-                      type="number"
-                      value={refrigerantes}
-                      onChange={(e) => setRefrigerantes(Number(e.target.value))}
-                      placeholder="0"
-                      min="0"
-                    />
-                  </div>
+                  <Button
+                    onClick={testarConexaoMarxVendas}
+                    disabled={statusConexao === 'conectando'}
+                    size="sm"
+                    variant="outline"
+                  >
+                    Testar Conexão
+                  </Button>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="lucro" className="flex items-center gap-2">
-                    <DollarSign className="h-4 w-4" />
-                    Lucro do Dia (R$)
-                  </Label>
-                  <Input
-                    id="lucro"
-                    type="number"
-                    step="0.01"
-                    value={lucroDia}
-                    onChange={(e) => setLucroDia(Number(e.target.value))}
-                    placeholder="0.00"
-                    min="0"
-                    className="text-lg font-medium"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="observacoes">Observações (opcional)</Label>
-                  <Textarea
-                    id="observacoes"
-                    value={observacoes}
-                    onChange={(e) => setObservacoes(e.target.value)}
-                    placeholder="Detalhes sobre as vendas..."
-                    rows={3}
-                  />
-                </div>
-
-                <Button
-                  onClick={enviarVendasDetalhadas}
-                  disabled={loadingSync || (paes + salgados + chocolates + refrigerantes) <= 0}
-                  className="w-full flex items-center gap-2"
-                >
-                  {loadingSync ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Upload className="h-4 w-4" />
-                  )}
-                  Enviar Vendas Detalhadas
-                </Button>
+                {ultimaSincronizacao && (
+                  <div className="text-sm text-muted-foreground">
+                    Última sincronização: {ultimaSincronizacao}
+                  </div>
+                )}
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Zap className="h-5 w-5" />
-                  Sincronização Automática
+                  <Download className="h-5 w-5" />
+                  Receber Dados do Marx Vendas
                 </CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  Sincronize automaticamente do Marx Vendas
+                  Receba dados de vendas do Marx Vendas para esta data
                 </p>
               </CardHeader>
               <CardContent>
                 <Button
-                  onClick={sincronizarMarxVendas}
-                  disabled={loadingSync}
+                  onClick={receberDadosMarxVendas}
+                  disabled={loadingSync || statusConexao !== 'conectado'}
                   className="w-full flex items-center gap-2"
                 >
                   {loadingSync ? (
@@ -430,7 +321,7 @@ function IntegracaoVendas() {
                   ) : (
                     <Download className="h-4 w-4" />
                   )}
-                  Sincronizar do Marx Vendas
+                  Receber Dados do Marx Vendas
                 </Button>
               </CardContent>
             </Card>
