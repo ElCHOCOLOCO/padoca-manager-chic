@@ -10,6 +10,7 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, TrendingUp, TrendingDown, Target, BarChart3, RefreshCw, Save, X, History, Calendar } from "lucide-react";
 import TesteConexao from "./TesteConexao";
+import LoginForm from "../auth/LoginForm";
 
 type InstitutoVenda = {
   id: string;
@@ -164,6 +165,7 @@ function ProjecaoVendas() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [dataReferencia, setDataReferencia] = useState(new Date().toISOString().split('T')[0]);
   const [activeTab, setActiveTab] = useState('matriz');
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
 
   // Estados para edição inline
   const [editingCell, setEditingCell] = useState<{instituto: string, dia: string} | null>(null);
@@ -262,10 +264,23 @@ function ProjecaoVendas() {
     }
   }, [dataReferencia]);
 
+  // Verificar autenticação
   useEffect(() => {
-    console.log("🔄 ProjecaoVendas: useEffect executado");
-    loadData();
-  }, [loadData]);
+    const checkAuth = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setIsAuthenticated(!!user);
+      console.log("🔐 ProjecaoVendas: Status de autenticação:", !!user);
+    };
+    
+    checkAuth();
+  }, []);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      console.log("🔄 ProjecaoVendas: useEffect executado (usuário autenticado)");
+      loadData();
+    }
+  }, [loadData, isAuthenticated]);
 
   const handleSaveVenda = useCallback(async (institutoId: string, dia: string, turno: string, projetado: number, vendeu: number) => {
     if (isUpdating) return;
@@ -398,6 +413,32 @@ function ProjecaoVendas() {
 
   console.log("✅ ProjecaoVendas: Renderizando componente principal");
 
+  // Se ainda não verificou a autenticação, mostrar loading
+  if (isAuthenticated === null) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="flex items-center gap-2">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+          <div className="text-lg">Verificando autenticação...</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Se não está autenticado, mostrar formulário de login
+  if (!isAuthenticated) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold mb-2">Vendas</h1>
+          <p className="text-muted-foreground">Faça login para acessar o sistema de vendas</p>
+        </div>
+        <LoginForm />
+      </div>
+    );
+  }
+
+  // Se está autenticado, mostrar o conteúdo normal
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
