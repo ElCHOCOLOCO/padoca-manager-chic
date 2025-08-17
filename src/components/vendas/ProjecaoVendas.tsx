@@ -32,6 +32,41 @@ type VendaHistorico = {
   created_at: string;
 };
 
+type ProjecaoVenda = {
+  instituto_codigo: string;
+  instituto_nome: string;
+  turno: string;
+  dia: string;
+  projecao: number;
+  vendas_reais: number;
+  diferenca: number;
+  percentual_atingimento: number;
+};
+
+type AnaliseOfertaDemanda = {
+  instituto_codigo: string;
+  instituto_nome: string;
+  turno: string;
+  demanda_media: number;
+  oferta_atual: number;
+  deficit: number;
+  recomendacao: string;
+  prioridade: 'alta' | 'media' | 'baixa';
+};
+
+type MetaVenda = {
+  id: string;
+  instituto_id: string;
+  instituto_codigo: string;
+  instituto_nome: string;
+  periodo: string;
+  meta_quantidade: number;
+  meta_valor: number;
+  vendas_atuais: number;
+  percentual_atingimento: number;
+  status: 'acima' | 'dentro' | 'abaixo';
+};
+
 const diasSemana = ['seg', 'ter', 'qua', 'qui', 'sex'] as const;
 const labelDia: Record<string, string> = {
   seg: 'Segunda',
@@ -167,6 +202,11 @@ function ProjecaoVendas() {
   const [activeTab, setActiveTab] = useState('matriz');
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
 
+  // Estados para funcionalidades de análise
+  const [analiseOfertaDemanda, setAnaliseOfertaDemanda] = useState<AnaliseOfertaDemanda[]>([]);
+  const [metasVendas, setMetasVendas] = useState<MetaVenda[]>([]);
+  const [loadingAnalise, setLoadingAnalise] = useState(false);
+
   // Estados para edição inline
   const [editingCell, setEditingCell] = useState<{instituto: string, dia: string} | null>(null);
 
@@ -281,6 +321,136 @@ function ProjecaoVendas() {
       loadData();
     }
   }, [loadData, isAuthenticated]);
+
+  // Carregar análise de oferta e demanda
+  const loadAnaliseOfertaDemanda = useCallback(async () => {
+    console.log("📊 ProjecaoVendas: Carregando análise de oferta e demanda");
+    setLoadingAnalise(true);
+    try {
+      // Calcular demanda média baseada no histórico
+      const demandaPorInstituto = new Map<string, number>();
+      
+      historico.forEach(item => {
+        const key = `${item.instituto_codigo}_${item.turno}`;
+        const atual = demandaPorInstituto.get(key) || 0;
+        demandaPorInstituto.set(key, atual + item.vendeu);
+      });
+
+      // Calcular oferta atual (projeções)
+      const ofertaPorInstituto = new Map<string, number>();
+      
+      historico.forEach(item => {
+        const key = `${item.instituto_codigo}_${item.turno}`;
+        const atual = ofertaPorInstituto.get(key) || 0;
+        ofertaPorInstituto.set(key, atual + item.projetado);
+      });
+
+      // Gerar análise
+      const analise: AnaliseOfertaDemanda[] = institutos.map(instituto => {
+        const key = `${instituto.codigo}_${instituto.turno}`;
+        const demandaMedia = demandaPorInstituto.get(key) || 0;
+        const ofertaAtual = ofertaPorInstituto.get(key) || 0;
+        const deficit = Math.max(0, demandaMedia - ofertaAtual);
+        
+        let recomendacao = "Manter oferta atual";
+        let prioridade: 'alta' | 'media' | 'baixa' = 'baixa';
+        
+        if (deficit > demandaMedia * 0.3) {
+          recomendacao = "Aumentar oferta significativamente";
+          prioridade = 'alta';
+        } else if (deficit > demandaMedia * 0.1) {
+          recomendacao = "Aumentar oferta moderadamente";
+          prioridade = 'media';
+        } else if (ofertaAtual > demandaMedia * 1.5) {
+          recomendacao = "Reduzir oferta - excesso de estoque";
+          prioridade = 'media';
+        }
+
+        return {
+          instituto_codigo: instituto.codigo,
+          instituto_nome: instituto.nome,
+          turno: instituto.turno,
+          demanda_media: demandaMedia,
+          oferta_atual: ofertaAtual,
+          deficit: deficit,
+          recomendacao: recomendacao,
+          prioridade: prioridade
+        };
+      });
+
+      setAnaliseOfertaDemanda(analise);
+      console.log("✅ ProjecaoVendas: Análise de oferta e demanda carregada:", analise.length);
+    } catch (error: any) {
+      console.error("❌ ProjecaoVendas: Erro ao carregar análise:", error);
+      toast({ title: "Erro", description: "Erro ao carregar análise de oferta e demanda" });
+    } finally {
+      setLoadingAnalise(false);
+    }
+  }, [historico, institutos]);
+
+  // Carregar metas de vendas
+  const loadMetasVendas = useCallback(async () => {
+    console.log("📊 ProjecaoVendas: Carregando metas de vendas");
+    setLoadingAnalise(true);
+    try {
+      // Calcular vendas atuais por instituto
+      const vendasPorInstituto = new Map<string, number>();
+      
+      historico.forEach(item => {
+        const atual = vendasPorInstituto.get(item.instituto_codigo) || 0;
+        vendasPorInstituto.set(item.instituto_codigo, atual + item.vendeu);
+      });
+
+      // Gerar metas baseadas em vendas históricas
+      const metas: MetaVenda[] = institutos.map(instituto => {
+        const vendasAtuais = vendasPorInstituto.get(instituto.codigo) || 0;
+        const metaQuantidade = Math.max(10, vendasAtuais * 1.2); // Meta 20% acima do atual
+        const metaValor = metaQuantidade * 5; // Valor médio por item
+        const percentualAtingimento = vendasAtuais > 0 ? (vendasAtuais / metaQuantidade) * 100 : 0;
+        
+        let status: 'acima' | 'dentro' | 'abaixo' = 'abaixo';
+        if (percentualAtingimento >= 100) {
+          status = 'acima';
+        } else if (percentualAtingimento >= 80) {
+          status = 'dentro';
+        }
+
+        return {
+          id: instituto.id,
+          instituto_id: instituto.id,
+          instituto_codigo: instituto.codigo,
+          instituto_nome: instituto.nome,
+          periodo: 'Semana Atual',
+          meta_quantidade: metaQuantidade,
+          meta_valor: metaValor,
+          vendas_atuais: vendasAtuais,
+          percentual_atingimento: percentualAtingimento,
+          status: status
+        };
+      });
+
+      setMetasVendas(metas);
+      console.log("✅ ProjecaoVendas: Metas de vendas carregadas:", metas.length);
+    } catch (error: any) {
+      console.error("❌ ProjecaoVendas: Erro ao carregar metas:", error);
+      toast({ title: "Erro", description: "Erro ao carregar metas de vendas" });
+    } finally {
+      setLoadingAnalise(false);
+    }
+  }, [historico, institutos]);
+
+  // Carregar análises quando mudar a aba
+  useEffect(() => {
+    if (activeTab === 'analise' && institutos.length > 0) {
+      loadAnaliseOfertaDemanda();
+    }
+  }, [activeTab, loadAnaliseOfertaDemanda]);
+
+  useEffect(() => {
+    if (activeTab === 'metas' && institutos.length > 0) {
+      loadMetasVendas();
+    }
+  }, [activeTab, loadMetasVendas]);
 
   const handleSaveVenda = useCallback(async (institutoId: string, dia: string, turno: string, projetado: number, vendeu: number) => {
     if (isUpdating) return;
@@ -466,7 +636,7 @@ function ProjecaoVendas() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="matriz" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
             Matriz de Vendas
@@ -478,6 +648,14 @@ function ProjecaoVendas() {
           <TabsTrigger value="dashboard" className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4" />
             Dashboard
+          </TabsTrigger>
+          <TabsTrigger value="analise" className="flex items-center gap-2">
+            <Target className="h-4 w-4" />
+            Análise Oferta/Demanda
+          </TabsTrigger>
+          <TabsTrigger value="metas" className="flex items-center gap-2">
+            <TrendingUp className="h-4 w-4" />
+            Metas de Vendas
           </TabsTrigger>
           <TabsTrigger value="teste" className="flex items-center gap-2">
             <Calendar className="h-4 w-4" />
@@ -666,6 +844,170 @@ function ProjecaoVendas() {
                   ))}
                 </div>
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="analise" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Target className="h-5 w-5" />
+                Análise de Oferta e Demanda
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Análise comparativa entre demanda média e oferta atual por instituto
+              </p>
+            </CardHeader>
+            <CardContent>
+              {loadingAnalise ? (
+                <div className="flex items-center justify-center p-8">
+                  <div className="flex items-center gap-2">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                    <div className="text-lg">Carregando análise...</div>
+                  </div>
+                </div>
+              ) : analiseOfertaDemanda.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Target className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>Nenhuma análise disponível. Adicione dados de vendas primeiro.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {analiseOfertaDemanda.map((item, index) => (
+                      <Card key={index} className="hover:shadow-md transition-shadow">
+                        <CardHeader className="pb-3">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <CardTitle className="text-lg">{item.instituto_codigo}</CardTitle>
+                              <p className="text-sm text-muted-foreground">{item.instituto_nome}</p>
+                            </div>
+                            <Badge 
+                              variant={item.prioridade === 'alta' ? 'destructive' : item.prioridade === 'media' ? 'default' : 'secondary'}
+                              className="text-xs"
+                            >
+                              {item.prioridade.toUpperCase()}
+                            </Badge>
+                          </div>
+                          <Badge variant="outline" className="text-xs">
+                            {labelTurno[item.turno]}
+                          </Badge>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                          <div className="grid grid-cols-2 gap-2 text-sm">
+                            <div>
+                              <div className="font-medium text-blue-600">Demanda Média</div>
+                              <div className="text-lg font-bold">{item.demanda_media}</div>
+                            </div>
+                            <div>
+                              <div className="font-medium text-green-600">Oferta Atual</div>
+                              <div className="text-lg font-bold">{item.oferta_atual}</div>
+                            </div>
+                          </div>
+                          
+                          {item.deficit > 0 && (
+                            <div className="bg-red-50 border border-red-200 rounded p-2">
+                              <div className="text-sm font-medium text-red-800">Déficit: {item.deficit}</div>
+                            </div>
+                          )}
+                          
+                          <div className="text-sm">
+                            <div className="font-medium mb-1">Recomendação:</div>
+                            <div className="text-muted-foreground">{item.recomendacao}</div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="metas" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5" />
+                Metas de Vendas
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Acompanhamento de metas por instituto e período
+              </p>
+            </CardHeader>
+            <CardContent>
+              {loadingAnalise ? (
+                <div className="flex items-center justify-center p-8">
+                  <div className="flex items-center gap-2">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                    <div className="text-lg">Carregando metas...</div>
+                  </div>
+                </div>
+              ) : metasVendas.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <TrendingUp className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>Nenhuma meta disponível. Adicione dados de vendas primeiro.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {metasVendas.map((meta) => (
+                      <Card key={meta.id} className="hover:shadow-md transition-shadow">
+                        <CardHeader className="pb-3">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <CardTitle className="text-lg">{meta.instituto_codigo}</CardTitle>
+                              <p className="text-sm text-muted-foreground">{meta.instituto_nome}</p>
+                            </div>
+                            <Badge 
+                              variant={meta.status === 'acima' ? 'default' : meta.status === 'dentro' ? 'secondary' : 'destructive'}
+                              className="text-xs"
+                            >
+                              {meta.status === 'acima' ? 'ACIMA' : meta.status === 'dentro' ? 'DENTRO' : 'ABAIXO'}
+                            </Badge>
+                          </div>
+                          <div className="text-xs text-muted-foreground">{meta.periodo}</div>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                          <div className="grid grid-cols-2 gap-2 text-sm">
+                            <div>
+                              <div className="font-medium text-blue-600">Meta</div>
+                              <div className="text-lg font-bold">{meta.meta_quantidade}</div>
+                            </div>
+                            <div>
+                              <div className="font-medium text-green-600">Vendido</div>
+                              <div className="text-lg font-bold">{meta.vendas_atuais}</div>
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                              <span>Atingimento:</span>
+                              <span className="font-medium">{meta.percentual_atingimento.toFixed(1)}%</span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2">
+                              <div 
+                                className={`h-2 rounded-full ${
+                                  meta.percentual_atingimento >= 100 ? 'bg-green-500' : 
+                                  meta.percentual_atingimento >= 80 ? 'bg-yellow-500' : 'bg-red-500'
+                                }`}
+                                style={{ width: `${Math.min(100, meta.percentual_atingimento)}%` }}
+                              ></div>
+                            </div>
+                          </div>
+                          
+                          <div className="text-sm">
+                            <div className="font-medium">Meta de Valor:</div>
+                            <div className="text-muted-foreground">R$ {meta.meta_valor.toFixed(2)}</div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
