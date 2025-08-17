@@ -1,36 +1,37 @@
 -- =====================================================
--- DESABILITAR RLS PARA TABELA DE VENDAS DETALHADAS
+-- DESABILITAR RLS PARA VENDAS DETALHADAS
 -- =====================================================
--- ⚠️ ATENÇÃO: Este script desabilita as políticas de segurança
--- Use apenas para desenvolvimento local
 
--- 1. Desabilitar RLS na tabela de vendas detalhadas
+-- Desabilitar RLS para desenvolvimento sem autenticação
 ALTER TABLE vendas_detalhadas DISABLE ROW LEVEL SECURITY;
 
--- 2. Verificar status
+-- Verificar se RLS foi desabilitado
 SELECT 
     schemaname,
     tablename,
-    rowsecurity as rls_enabled
+    rowsecurity
 FROM pg_tables 
-WHERE tablename = 'vendas_detalhadas'
-AND schemaname = 'public';
+WHERE tablename = 'vendas_detalhadas';
 
--- 3. Testar acesso sem autenticação
+-- Verificar políticas existentes
 SELECT 
-    'Teste de acesso sem autenticação' as info,
-    COUNT(*) as total_registros
+    schemaname,
+    tablename,
+    policyname,
+    permissive,
+    roles,
+    cmd,
+    qual,
+    with_check
+FROM pg_policies 
+WHERE tablename = 'vendas_detalhadas';
+
+-- Testar acesso sem autenticação
+SELECT COUNT(*) as total_registros FROM vendas_detalhadas;
+
+-- Mostrar estrutura final
+SELECT 
+    'vendas_detalhadas' as tabela,
+    'RLS Desabilitado' as status,
+    COUNT(*) as registros_existentes
 FROM vendas_detalhadas;
-
--- 4. Verificar estrutura da tabela
-SELECT 
-    column_name,
-    data_type,
-    is_nullable
-FROM information_schema.columns 
-WHERE table_name = 'vendas_detalhadas' 
-AND table_schema = 'public'
-ORDER BY ordinal_position;
-
--- 5. Testar view de resumo
-SELECT * FROM resumo_vendas_diarias LIMIT 3;
