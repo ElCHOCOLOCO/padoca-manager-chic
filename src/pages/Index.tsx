@@ -23,6 +23,7 @@ import React, { Suspense, lazy } from "react";
 
 // Lazy loading para componentes pesados
 const ProjecaoVendas = lazy(() => import("@/components/vendas/ProjecaoVendas"));
+const IntegracaoVendas = lazy(() => import("@/components/integracao/IntegracaoVendas"));
 
 // Tipos
 type Turno = "manha" | "tarde" | "noite";
@@ -568,8 +569,17 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
             <EntradasPanel />
           </TabsContent>
 
-          <TabsContent value="integracao" className="mt-6">
-            <IntegrationTab />
+          <TabsContent value="integracao" className="mt-6 space-y-6">
+            <Suspense fallback={
+              <div className="flex items-center justify-center p-8">
+                <div className="flex items-center gap-2">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                  <div className="text-lg">Carregando Integração...</div>
+                </div>
+              </div>
+            }>
+              <IntegracaoVendas />
+            </Suspense>
           </TabsContent>
 
           <TabsContent value="cas" className="mt-6 space-y-6">
