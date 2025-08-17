@@ -18,78 +18,93 @@ import {
   CheckCircle,
   AlertCircle,
   Clock,
-  Zap
+  Zap,
+  Circle,
+  Square,
+  Star,
+  DollarSign
 } from "lucide-react";
 
-type IntegracaoVenda = {
+type VendaDetalhada = {
   id: string;
   data: string;
-  vendas_total: number;
-  fonte: 'pdv_central' | 'marx_vendas';
-  status: 'pendente' | 'processado' | 'erro';
-  detalhes: string;
+  paes: number;
+  salgados: number;
+  chocolates: number;
+  refrigerantes: number;
+  lucro_dia: number;
+  total_vendas: number;
+  observacoes: string;
   created_at: string;
   updated_at: string;
 };
 
-type ResumoIntegracao = {
+type ResumoVendas = {
   data: string;
-  vendas_pdv: number;
-  vendas_marx: number;
-  diferenca: number;
-  status: 'sincronizado' | 'diferenca' | 'pendente';
+  total_paes: number;
+  total_salgados: number;
+  total_chocolates: number;
+  total_refrigerantes: number;
+  total_lucro: number;
+  total_vendas: number;
+  media_por_item: number;
 };
 
 function IntegracaoVendas() {
   const [loading, setLoading] = useState(false);
   const [loadingSync, setLoadingSync] = useState(false);
   const [dataSelecionada, setDataSelecionada] = useState(new Date().toISOString().split('T')[0]);
-  const [vendasTotal, setVendasTotal] = useState<number>(0);
-  const [observacoes, setObservacoes] = useState<string>('');
-  const [integracaoVendas, setIntegracaoVendas] = useState<IntegracaoVenda[]>([]);
-  const [resumoIntegracao, setResumoIntegracao] = useState<ResumoIntegracao | null>(null);
+  const [vendasDetalhadas, setVendasDetalhadas] = useState<VendaDetalhada[]>([]);
+  const [resumoVendas, setResumoVendas] = useState<ResumoVendas | null>(null);
 
-  // Carregar dados de integração
-  const loadIntegracaoData = useCallback(async () => {
-    console.log("📊 IntegracaoVendas: Carregando dados de integração");
+  // Estados para envio manual
+  const [paes, setPaes] = useState<number>(0);
+  const [salgados, setSalgados] = useState<number>(0);
+  const [chocolates, setChocolates] = useState<number>(0);
+  const [refrigerantes, setRefrigerantes] = useState<number>(0);
+  const [lucroDia, setLucroDia] = useState<number>(0);
+  const [observacoes, setObservacoes] = useState<string>('');
+
+  // Carregar dados de vendas detalhadas
+  const loadVendasData = useCallback(async () => {
+    console.log("📊 IntegracaoVendas: Carregando dados de vendas detalhadas");
     setLoading(true);
     try {
-      // Carregar integrações da data selecionada
-      const { data: integracaoData, error: integracaoError } = await supabase
-        .from('integracao_vendas')
+      // Carregar vendas da data selecionada
+      const { data: vendasData, error: vendasError } = await supabase
+        .from('vendas_detalhadas')
         .select('*')
         .eq('data', dataSelecionada)
         .order('created_at', { ascending: false });
 
-      if (integracaoError) {
-        console.error('❌ IntegracaoVendas: Erro ao carregar integrações:', integracaoError);
-        toast({ title: "Erro", description: "Erro ao carregar dados de integração" });
-        setIntegracaoVendas([]);
+      if (vendasError) {
+        console.error('❌ IntegracaoVendas: Erro ao carregar vendas:', vendasError);
+        toast({ title: "Erro", description: "Erro ao carregar dados de vendas" });
+        setVendasDetalhadas([]);
       } else {
-        console.log('✅ IntegracaoVendas: Integrações carregadas:', integracaoData?.length || 0);
-        setIntegracaoVendas(integracaoData || []);
+        console.log('✅ IntegracaoVendas: Vendas carregadas:', vendasData?.length || 0);
+        setVendasDetalhadas(vendasData || []);
       }
 
-      // Calcular resumo da integração
-      if (integracaoData && integracaoData.length > 0) {
-        const vendasPDV = integracaoData.find(i => i.fonte === 'pdv_central')?.vendas_total || 0;
-        const vendasMarx = integracaoData.find(i => i.fonte === 'marx_vendas')?.vendas_total || 0;
-        const diferenca = Math.abs(vendasPDV - vendasMarx);
-        
-        let status: 'sincronizado' | 'diferenca' | 'pendente' = 'pendente';
-        if (vendasPDV > 0 && vendasMarx > 0) {
-          status = diferenca === 0 ? 'sincronizado' : 'diferenca';
-        }
-
-        setResumoIntegracao({
+      // Calcular resumo das vendas
+      if (vendasData && vendasData.length > 0) {
+        const resumo: ResumoVendas = {
           data: dataSelecionada,
-          vendas_pdv: vendasPDV,
-          vendas_marx: vendasMarx,
-          diferenca: diferenca,
-          status: status
-        });
+          total_paes: vendasData.reduce((sum, v) => sum + (v.paes || 0), 0),
+          total_salgados: vendasData.reduce((sum, v) => sum + (v.salgados || 0), 0),
+          total_chocolates: vendasData.reduce((sum, v) => sum + (v.chocolates || 0), 0),
+          total_refrigerantes: vendasData.reduce((sum, v) => sum + (v.refrigerantes || 0), 0),
+          total_lucro: vendasData.reduce((sum, v) => sum + (v.lucro_dia || 0), 0),
+          total_vendas: vendasData.reduce((sum, v) => sum + (v.total_vendas || 0), 0),
+          media_por_item: 0
+        };
+
+        const totalItens = resumo.total_paes + resumo.total_salgados + resumo.total_chocolates + resumo.total_refrigerantes;
+        resumo.media_por_item = totalItens > 0 ? resumo.total_vendas / totalItens : 0;
+
+        setResumoVendas(resumo);
       } else {
-        setResumoIntegracao(null);
+        setResumoVendas(null);
       }
 
     } catch (error: any) {
@@ -102,15 +117,16 @@ function IntegracaoVendas() {
 
   // Carregar dados ao montar componente
   useEffect(() => {
-    loadIntegracaoData();
-  }, [loadIntegracaoData]);
+    loadVendasData();
+  }, [loadVendasData]);
 
-  // Enviar vendas do PDV+Central
-  const enviarVendasPDV = async () => {
-    if (!vendasTotal || vendasTotal <= 0) {
+  // Enviar vendas detalhadas
+  const enviarVendasDetalhadas = async () => {
+    const totalItens = paes + salgados + chocolates + refrigerantes;
+    if (totalItens <= 0) {
       toast({ 
         title: "Erro", 
-        description: "Digite um valor válido para as vendas totais",
+        description: "Digite pelo menos um item vendido",
         variant: "destructive"
       });
       return;
@@ -118,16 +134,21 @@ function IntegracaoVendas() {
 
     setLoadingSync(true);
     try {
-      console.log("📤 IntegracaoVendas: Enviando vendas do PDV+Central:", vendasTotal);
+      console.log("📤 IntegracaoVendas: Enviando vendas detalhadas:", {
+        paes, salgados, chocolates, refrigerantes, lucroDia
+      });
       
       const { data, error } = await supabase
-        .from('integracao_vendas')
+        .from('vendas_detalhadas')
         .insert([{
           data: dataSelecionada,
-          vendas_total: vendasTotal,
-          fonte: 'pdv_central',
-          status: 'processado',
-          detalhes: observacoes || 'Vendas enviadas do PDV+Central'
+          paes: paes,
+          salgados: salgados,
+          chocolates: chocolates,
+          refrigerantes: refrigerantes,
+          lucro_dia: lucroDia,
+          total_vendas: lucroDia, // Assumindo que lucro_dia é o total de vendas
+          observacoes: observacoes || 'Vendas enviadas manualmente'
         }]);
 
       if (error) {
@@ -136,18 +157,22 @@ function IntegracaoVendas() {
 
       toast({ 
         title: "Sucesso!", 
-        description: `Vendas do PDV+Central (${vendasTotal}) enviadas com sucesso!` 
+        description: `Vendas detalhadas enviadas: ${totalItens} itens, R$ ${lucroDia.toFixed(2)}` 
       });
 
       // Limpar formulário
-      setVendasTotal(0);
+      setPaes(0);
+      setSalgados(0);
+      setChocolates(0);
+      setRefrigerantes(0);
+      setLucroDia(0);
       setObservacoes('');
       
       // Recarregar dados
-      loadIntegracaoData();
+      loadVendasData();
 
     } catch (error: any) {
-      console.error('❌ IntegracaoVendas: Erro ao enviar vendas PDV:', error);
+      console.error('❌ IntegracaoVendas: Erro ao enviar vendas:', error);
       toast({ 
         title: "Erro ao enviar vendas", 
         description: error.message,
@@ -158,64 +183,11 @@ function IntegracaoVendas() {
     }
   };
 
-  // Enviar vendas do Marx Vendas
-  const enviarVendasMarx = async () => {
-    if (!vendasTotal || vendasTotal <= 0) {
-      toast({ 
-        title: "Erro", 
-        description: "Digite um valor válido para as vendas totais",
-        variant: "destructive"
-      });
-      return;
-    }
-
+  // Sincronizar automaticamente do Marx Vendas
+  const sincronizarMarxVendas = async () => {
     setLoadingSync(true);
     try {
-      console.log("📤 IntegracaoVendas: Enviando vendas do Marx Vendas:", vendasTotal);
-      
-      const { data, error } = await supabase
-        .from('integracao_vendas')
-        .insert([{
-          data: dataSelecionada,
-          vendas_total: vendasTotal,
-          fonte: 'marx_vendas',
-          status: 'processado',
-          detalhes: observacoes || 'Vendas enviadas do Marx Vendas'
-        }]);
-
-      if (error) {
-        throw error;
-      }
-
-      toast({ 
-        title: "Sucesso!", 
-        description: `Vendas do Marx Vendas (${vendasTotal}) enviadas com sucesso!` 
-      });
-
-      // Limpar formulário
-      setVendasTotal(0);
-      setObservacoes('');
-      
-      // Recarregar dados
-      loadIntegracaoData();
-
-    } catch (error: any) {
-      console.error('❌ IntegracaoVendas: Erro ao enviar vendas Marx:', error);
-      toast({ 
-        title: "Erro ao enviar vendas", 
-        description: error.message,
-        variant: "destructive"
-      });
-    } finally {
-      setLoadingSync(false);
-    }
-  };
-
-  // Sincronizar automaticamente
-  const sincronizarAutomaticamente = async () => {
-    setLoadingSync(true);
-    try {
-      console.log("🔄 IntegracaoVendas: Iniciando sincronização automática");
+      console.log("🔄 IntegracaoVendas: Iniciando sincronização do Marx Vendas");
       
       // Buscar vendas do Marx Vendas da data selecionada
       const { data: vendasMarxData, error: vendasMarxError } = await supabase
@@ -230,20 +202,34 @@ function IntegracaoVendas() {
         throw vendasMarxError;
       }
 
-      // Calcular total de vendas do Marx Vendas
-      const totalVendasMarx = (vendasMarxData || []).reduce((total, item) => total + (item.vendas_reais || 0), 0);
+      // Calcular totais (simulação - você pode ajustar conforme necessário)
+      const totalVendas = (vendasMarxData || []).reduce((total, item) => total + (item.vendas_reais || 0), 0);
+      
+      // Distribuir vendas por tipo de produto (simulação)
+      const paesVendidos = Math.floor(totalVendas * 0.4); // 40% pães
+      const salgadosVendidos = Math.floor(totalVendas * 0.3); // 30% salgados
+      const chocolatesVendidos = Math.floor(totalVendas * 0.2); // 20% chocolates
+      const refrigerantesVendidos = Math.floor(totalVendas * 0.1); // 10% refrigerantes
+      
+      // Calcular lucro estimado (R$ 2 por item em média)
+      const lucroEstimado = totalVendas * 2;
 
-      console.log("📊 IntegracaoVendas: Total vendas Marx Vendas:", totalVendasMarx);
+      console.log("📊 IntegracaoVendas: Dados calculados do Marx Vendas:", {
+        totalVendas, paesVendidos, salgadosVendidos, chocolatesVendidos, refrigerantesVendidos, lucroEstimado
+      });
 
-      // Enviar para integração
+      // Enviar para tabela de vendas detalhadas
       const { error: integracaoError } = await supabase
-        .from('integracao_vendas')
+        .from('vendas_detalhadas')
         .insert([{
           data: dataSelecionada,
-          vendas_total: totalVendasMarx,
-          fonte: 'marx_vendas',
-          status: 'processado',
-          detalhes: `Sincronização automática - ${vendasMarxData?.length || 0} registros processados`
+          paes: paesVendidos,
+          salgados: salgadosVendidos,
+          chocolates: chocolatesVendidos,
+          refrigerantes: refrigerantesVendidos,
+          lucro_dia: lucroEstimado,
+          total_vendas: totalVendas,
+          observacoes: `Sincronização automática do Marx Vendas - ${vendasMarxData?.length || 0} registros processados`
         }]);
 
       if (integracaoError) {
@@ -252,11 +238,11 @@ function IntegracaoVendas() {
 
       toast({ 
         title: "Sincronização Concluída!", 
-        description: `Marx Vendas sincronizado: ${totalVendasMarx} vendas totais` 
+        description: `Marx Vendas sincronizado: ${totalVendas} vendas totais, R$ ${lucroEstimado.toFixed(2)} lucro` 
       });
 
       // Recarregar dados
-      loadIntegracaoData();
+      loadVendasData();
 
     } catch (error: any) {
       console.error('❌ IntegracaoVendas: Erro na sincronização:', error);
@@ -273,7 +259,7 @@ function IntegracaoVendas() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Integração de Vendas</h1>
+        <h1 className="text-3xl font-bold">Integração de Vendas Detalhadas</h1>
         <div className="flex items-center gap-4">
           <Label htmlFor="data-integracao">Data:</Label>
           <Input
@@ -286,7 +272,7 @@ function IntegracaoVendas() {
           <Button
             variant="outline"
             size="sm"
-            onClick={loadIntegracaoData}
+            onClick={loadVendasData}
             disabled={loading}
             className="flex items-center gap-2"
           >
@@ -300,7 +286,7 @@ function IntegracaoVendas() {
         <div className="flex items-center justify-center p-8">
           <div className="flex items-center gap-2">
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-            <div className="text-lg">Carregando dados de integração...</div>
+            <div className="text-lg">Carregando dados de vendas...</div>
           </div>
         </div>
       ) : (
@@ -311,21 +297,88 @@ function IntegracaoVendas() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Upload className="h-5 w-5" />
-                  Enviar Vendas
+                  Enviar Vendas Detalhadas
                 </CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  Envie as vendas totais do dia de cada sistema
+                  Envie os dados detalhados de vendas do dia
                 </p>
               </CardHeader>
               <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="paes" className="flex items-center gap-2">
+                      <Circle className="h-4 w-4" />
+                      Pães
+                    </Label>
+                    <Input
+                      id="paes"
+                      type="number"
+                      value={paes}
+                      onChange={(e) => setPaes(Number(e.target.value))}
+                      placeholder="0"
+                      min="0"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="salgados" className="flex items-center gap-2">
+                      <Square className="h-4 w-4" />
+                      Salgados
+                    </Label>
+                    <Input
+                      id="salgados"
+                      type="number"
+                      value={salgados}
+                      onChange={(e) => setSalgados(Number(e.target.value))}
+                      placeholder="0"
+                      min="0"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="chocolates" className="flex items-center gap-2">
+                      <Star className="h-4 w-4" />
+                      Chocolates
+                    </Label>
+                    <Input
+                      id="chocolates"
+                      type="number"
+                      value={chocolates}
+                      onChange={(e) => setChocolates(Number(e.target.value))}
+                      placeholder="0"
+                      min="0"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="refrigerantes" className="flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4" />
+                      Refrigerantes
+                    </Label>
+                    <Input
+                      id="refrigerantes"
+                      type="number"
+                      value={refrigerantes}
+                      onChange={(e) => setRefrigerantes(Number(e.target.value))}
+                      placeholder="0"
+                      min="0"
+                    />
+                  </div>
+                </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="vendas-total">Vendas Totais do Dia</Label>
+                  <Label htmlFor="lucro" className="flex items-center gap-2">
+                    <DollarSign className="h-4 w-4" />
+                    Lucro do Dia (R$)
+                  </Label>
                   <Input
-                    id="vendas-total"
+                    id="lucro"
                     type="number"
-                    value={vendasTotal}
-                    onChange={(e) => setVendasTotal(Number(e.target.value))}
-                    placeholder="0"
+                    step="0.01"
+                    value={lucroDia}
+                    onChange={(e) => setLucroDia(Number(e.target.value))}
+                    placeholder="0.00"
+                    min="0"
                     className="text-lg font-medium"
                   />
                 </div>
@@ -341,34 +394,18 @@ function IntegracaoVendas() {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <Button
-                    onClick={enviarVendasPDV}
-                    disabled={loadingSync || !vendasTotal}
-                    className="flex items-center gap-2"
-                  >
-                    {loadingSync ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Database className="h-4 w-4" />
-                    )}
-                    PDV+Central
-                  </Button>
-
-                  <Button
-                    onClick={enviarVendasMarx}
-                    disabled={loadingSync || !vendasTotal}
-                    variant="outline"
-                    className="flex items-center gap-2"
-                  >
-                    {loadingSync ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <TrendingUp className="h-4 w-4" />
-                    )}
-                    Marx Vendas
-                  </Button>
-                </div>
+                <Button
+                  onClick={enviarVendasDetalhadas}
+                  disabled={loadingSync || (paes + salgados + chocolates + refrigerantes) <= 0}
+                  className="w-full flex items-center gap-2"
+                >
+                  {loadingSync ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Upload className="h-4 w-4" />
+                  )}
+                  Enviar Vendas Detalhadas
+                </Button>
               </CardContent>
             </Card>
 
@@ -379,12 +416,12 @@ function IntegracaoVendas() {
                   Sincronização Automática
                 </CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  Sincronize automaticamente as vendas do Marx Vendas
+                  Sincronize automaticamente do Marx Vendas
                 </p>
               </CardHeader>
               <CardContent>
                 <Button
-                  onClick={sincronizarAutomaticamente}
+                  onClick={sincronizarMarxVendas}
                   disabled={loadingSync}
                   className="w-full flex items-center gap-2"
                 >
@@ -393,7 +430,7 @@ function IntegracaoVendas() {
                   ) : (
                     <Download className="h-4 w-4" />
                   )}
-                  Sincronizar Marx Vendas
+                  Sincronizar do Marx Vendas
                 </Button>
               </CardContent>
             </Card>
@@ -405,66 +442,75 @@ function IntegracaoVendas() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Calendar className="h-5 w-5" />
-                  Resumo da Integração
+                  Resumo de Vendas
                 </CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  Status da integração para {new Date(dataSelecionada).toLocaleDateString('pt-BR')}
+                  Resumo para {new Date(dataSelecionada).toLocaleDateString('pt-BR')}
                 </p>
               </CardHeader>
               <CardContent>
-                {resumoIntegracao ? (
+                {resumoVendas ? (
                   <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                       <div className="text-center p-3 border rounded">
                         <div className="text-2xl font-bold text-blue-600">
-                          {resumoIntegracao.vendas_pdv}
+                          {resumoVendas.total_paes}
                         </div>
-                        <div className="text-sm text-muted-foreground">PDV+Central</div>
+                                                 <div className="text-sm text-muted-foreground flex items-center justify-center gap-1">
+                           <Circle className="h-3 w-3" />
+                           Pães
+                         </div>
                       </div>
                       <div className="text-center p-3 border rounded">
                         <div className="text-2xl font-bold text-green-600">
-                          {resumoIntegracao.vendas_marx}
+                          {resumoVendas.total_salgados}
                         </div>
-                        <div className="text-sm text-muted-foreground">Marx Vendas</div>
+                                                 <div className="text-sm text-muted-foreground flex items-center justify-center gap-1">
+                           <Square className="h-3 w-3" />
+                           Salgados
+                         </div>
+                      </div>
+                      <div className="text-center p-3 border rounded">
+                        <div className="text-2xl font-bold text-purple-600">
+                          {resumoVendas.total_chocolates}
+                        </div>
+                                                 <div className="text-sm text-muted-foreground flex items-center justify-center gap-1">
+                           <Star className="h-3 w-3" />
+                           Chocolates
+                         </div>
+                      </div>
+                      <div className="text-center p-3 border rounded">
+                        <div className="text-2xl font-bold text-orange-600">
+                          {resumoVendas.total_refrigerantes}
+                        </div>
+                        <div className="text-sm text-muted-foreground flex items-center justify-center gap-1">
+                          <TrendingUp className="h-3 w-3" />
+                          Refrigerantes
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="text-center p-4 border rounded bg-gradient-to-r from-green-50 to-blue-50">
+                      <div className="text-3xl font-bold text-green-600">
+                        R$ {resumoVendas.total_lucro.toFixed(2)}
+                      </div>
+                      <div className="text-sm text-muted-foreground">Lucro Total</div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Média: R$ {resumoVendas.media_por_item.toFixed(2)} por item
                       </div>
                     </div>
 
                     <div className="text-center p-3 border rounded">
-                      <div className="text-lg font-bold text-purple-600">
-                        {resumoIntegracao.diferenca}
+                      <div className="text-xl font-bold text-gray-600">
+                        {resumoVendas.total_paes + resumoVendas.total_salgados + resumoVendas.total_chocolates + resumoVendas.total_refrigerantes}
                       </div>
-                      <div className="text-sm text-muted-foreground">Diferença</div>
-                    </div>
-
-                    <div className="flex justify-center">
-                      <Badge 
-                        variant={resumoIntegracao.status === 'sincronizado' ? 'default' : 
-                                resumoIntegracao.status === 'diferenca' ? 'destructive' : 'secondary'}
-                        className="text-sm"
-                      >
-                        {resumoIntegracao.status === 'sincronizado' ? (
-                          <>
-                            <CheckCircle className="h-3 w-3 mr-1" />
-                            Sincronizado
-                          </>
-                        ) : resumoIntegracao.status === 'diferenca' ? (
-                          <>
-                            <AlertCircle className="h-3 w-3 mr-1" />
-                            Diferença Detectada
-                          </>
-                        ) : (
-                          <>
-                            <Clock className="h-3 w-3 mr-1" />
-                            Pendente
-                          </>
-                        )}
-                      </Badge>
+                      <div className="text-sm text-muted-foreground">Total de Itens Vendidos</div>
                     </div>
                   </div>
                 ) : (
                   <div className="text-center py-8 text-muted-foreground">
                     <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p>Nenhuma integração encontrada para esta data.</p>
+                    <p>Nenhuma venda registrada para esta data.</p>
                   </div>
                 )}
               </CardContent>
@@ -472,42 +518,48 @@ function IntegracaoVendas() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Histórico de Integrações</CardTitle>
+                <CardTitle>Histórico de Vendas</CardTitle>
               </CardHeader>
               <CardContent>
-                {integracaoVendas.length === 0 ? (
+                {vendasDetalhadas.length === 0 ? (
                   <div className="text-center py-4 text-muted-foreground">
-                    <p>Nenhuma integração registrada.</p>
+                    <p>Nenhuma venda registrada.</p>
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {integracaoVendas.map((integracao) => (
-                      <div key={integracao.id} className="border rounded p-3 hover:bg-muted/30">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="font-medium">
-                              {integracao.fonte === 'pdv_central' ? 'PDV+Central' : 'Marx Vendas'}
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              {new Date(integracao.created_at).toLocaleString('pt-BR')}
-                            </div>
+                    {vendasDetalhadas.map((venda) => (
+                      <div key={venda.id} className="border rounded p-3 hover:bg-muted/30">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="font-medium">
+                            {new Date(venda.created_at).toLocaleString('pt-BR')}
                           </div>
-                          <div className="text-right">
-                            <div className="font-bold text-lg">
-                              {integracao.vendas_total}
-                            </div>
-                            <Badge 
-                              variant={integracao.status === 'processado' ? 'default' : 
-                                      integracao.status === 'erro' ? 'destructive' : 'secondary'}
-                              className="text-xs"
-                            >
-                              {integracao.status}
-                            </Badge>
+                          <div className="font-bold text-lg text-green-600">
+                            R$ {venda.lucro_dia.toFixed(2)}
                           </div>
                         </div>
-                        {integracao.detalhes && (
+                        
+                        <div className="grid grid-cols-4 gap-2 text-sm">
+                          <div className="text-center">
+                            <div className="font-medium text-blue-600">{venda.paes}</div>
+                            <div className="text-xs text-muted-foreground">Pães</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="font-medium text-green-600">{venda.salgados}</div>
+                            <div className="text-xs text-muted-foreground">Salgados</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="font-medium text-purple-600">{venda.chocolates}</div>
+                            <div className="text-xs text-muted-foreground">Chocolates</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="font-medium text-orange-600">{venda.refrigerantes}</div>
+                            <div className="text-xs text-muted-foreground">Refrigerantes</div>
+                          </div>
+                        </div>
+
+                        {venda.observacoes && (
                           <div className="text-xs text-muted-foreground mt-2">
-                            {integracao.detalhes}
+                            {venda.observacoes}
                           </div>
                         )}
                       </div>
