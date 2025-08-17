@@ -300,22 +300,25 @@ function ProjecaoVendas() {
       toast({ title: "Erro ao carregar dados", description: error.message });
     } finally {
       setLoading(false);
-      console.log("✅ ProjecaoVendas: Carregamento finalizado");
+      console.log("✅ ProjecaoVendas: Carregamento finalizado - loading:", false);
     }
   }, [dataReferencia]);
 
   // Verificar autenticação
   useEffect(() => {
     const checkAuth = async () => {
+      console.log("🔐 ProjecaoVendas: Verificando autenticação...");
       const { data: { user } } = await supabase.auth.getUser();
-      setIsAuthenticated(!!user);
-      console.log("🔐 ProjecaoVendas: Status de autenticação:", !!user);
+      const isAuth = !!user;
+      setIsAuthenticated(isAuth);
+      console.log("🔐 ProjecaoVendas: Status de autenticação:", isAuth);
     };
     
     checkAuth();
   }, []);
 
   useEffect(() => {
+    console.log("🔄 ProjecaoVendas: useEffect loadData - isAuthenticated:", isAuthenticated);
     if (isAuthenticated) {
       console.log("🔄 ProjecaoVendas: useEffect executado (usuário autenticado)");
       loadData();
@@ -441,16 +444,16 @@ function ProjecaoVendas() {
 
   // Carregar análises quando mudar a aba
   useEffect(() => {
-    if (activeTab === 'analise' && institutos.length > 0) {
+    if (activeTab === 'analise' && institutos.length > 0 && historico.length >= 0) {
       loadAnaliseOfertaDemanda();
     }
-  }, [activeTab, loadAnaliseOfertaDemanda]);
+  }, [activeTab, institutos.length, historico.length]);
 
   useEffect(() => {
-    if (activeTab === 'metas' && institutos.length > 0) {
+    if (activeTab === 'metas' && institutos.length > 0 && historico.length >= 0) {
       loadMetasVendas();
     }
-  }, [activeTab, loadMetasVendas]);
+  }, [activeTab, institutos.length, historico.length]);
 
   const handleSaveVenda = useCallback(async (institutoId: string, dia: string, turno: string, projetado: number, vendeu: number) => {
     if (isUpdating) return;
