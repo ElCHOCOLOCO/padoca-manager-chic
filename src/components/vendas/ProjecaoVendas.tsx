@@ -155,6 +155,8 @@ const CelulaVenda = React.memo(({
 CelulaVenda.displayName = 'CelulaVenda';
 
 function ProjecaoVendas() {
+  console.log("🚀 ProjecaoVendas: Componente iniciado");
+  
   const [institutos, setInstitutos] = useState<InstitutoVenda[]>([]);
   const [historico, setHistorico] = useState<VendaHistorico[]>([]);
   const [loading, setLoading] = useState(true);
@@ -167,24 +169,27 @@ function ProjecaoVendas() {
 
   // Carregar dados
   const loadData = useCallback(async () => {
+    console.log("📊 ProjecaoVendas: Iniciando carregamento de dados");
     setLoading(true);
     try {
       // Carregar institutos
+      console.log("🔍 ProjecaoVendas: Carregando institutos...");
       const { data: institutosData, error: institutosError } = await supabase
         .from('institutos_vendas')
         .select('*')
         .order('codigo');
 
       if (institutosError) {
-        console.error('Erro ao carregar institutos:', institutosError);
+        console.error('❌ ProjecaoVendas: Erro ao carregar institutos:', institutosError);
         toast({ title: "Erro", description: "Erro ao carregar institutos" });
         setInstitutos([]);
       } else {
+        console.log('✅ ProjecaoVendas: Institutos carregados:', institutosData?.length || 0);
         setInstitutos(institutosData || []);
-        console.log('Institutos carregados:', institutosData?.length || 0);
       }
 
       // Carregar histórico
+      console.log("🔍 ProjecaoVendas: Carregando histórico...");
       const { data: historicoData, error: historicoError } = await supabase
         .from('projecoes_vendas')
         .select(`
@@ -202,9 +207,10 @@ function ProjecaoVendas() {
         .order('created_at', { ascending: false });
 
       if (historicoError) {
-        console.error('Erro ao carregar histórico:', historicoError);
+        console.error('❌ ProjecaoVendas: Erro ao carregar histórico:', historicoError);
         setHistorico([]);
       } else {
+        console.log('✅ ProjecaoVendas: Histórico carregado:', historicoData?.length || 0);
         const historicoFormatado = (historicoData || []).map(item => ({
           id: item.id,
           instituto_id: item.instituto_id,
@@ -221,20 +227,23 @@ function ProjecaoVendas() {
       }
 
     } catch (error: any) {
-      console.error('Erro geral ao carregar dados:', error);
+      console.error('❌ ProjecaoVendas: Erro geral ao carregar dados:', error);
       toast({ title: "Erro ao carregar dados", description: error.message });
     } finally {
       setLoading(false);
+      console.log("✅ ProjecaoVendas: Carregamento finalizado");
     }
   }, [dataReferencia]);
 
   useEffect(() => {
+    console.log("🔄 ProjecaoVendas: useEffect executado");
     loadData();
   }, [loadData]);
 
   const handleSaveVenda = useCallback(async (institutoId: string, dia: string, turno: string, projetado: number, vendeu: number) => {
     if (isUpdating) return;
     
+    console.log("💾 ProjecaoVendas: Salvando venda", { institutoId, dia, turno, projetado, vendeu });
     setIsUpdating(true);
     try {
       // Verificar se já existe registro para este instituto/dia/turno/data
@@ -285,7 +294,7 @@ function ProjecaoVendas() {
       // Recarregar dados
       loadData();
     } catch (error: any) {
-      console.error('Erro ao salvar venda:', error);
+      console.error('❌ ProjecaoVendas: Erro ao salvar venda:', error);
       toast({ title: "Erro ao salvar", description: error.message });
     } finally {
       setIsUpdating(false);
@@ -341,7 +350,15 @@ function ProjecaoVendas() {
       .slice(0, 5);
   }, [institutos, historico]);
 
+  console.log("🎯 ProjecaoVendas: Renderizando com", { 
+    institutos: institutos.length, 
+    historico: historico.length, 
+    loading, 
+    dataReferencia 
+  });
+
   if (loading) {
+    console.log("⏳ ProjecaoVendas: Mostrando loading");
     return (
       <div className="flex items-center justify-center p-8">
         <div className="flex items-center gap-2">
@@ -351,6 +368,8 @@ function ProjecaoVendas() {
       </div>
     );
   }
+
+  console.log("✅ ProjecaoVendas: Renderizando componente principal");
 
   return (
     <div className="space-y-6">
@@ -403,60 +422,67 @@ function ProjecaoVendas() {
               </p>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-56 bg-muted/50 sticky left-0 z-10">
-                        <div className="font-bold text-center">Instituto</div>
-                      </TableHead>
-                      {diasSemana.map(dia => (
-                        <TableHead key={dia} className="text-center min-w-40 bg-muted/30">
-                          <div className="font-medium text-lg">{labelDia[dia]}</div>
-                          <div className="text-xs text-muted-foreground">Proj | Vendeu</div>
+              {institutos.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <BarChart3 className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>Nenhum instituto encontrado. Verifique se a tabela institutos_vendas foi criada.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-56 bg-muted/50 sticky left-0 z-10">
+                          <div className="font-bold text-center">Instituto</div>
                         </TableHead>
-                      ))}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {institutos.map(instituto => (
-                      <TableRow key={instituto.id} className="hover:bg-muted/30">
-                        <TableCell className="font-medium bg-muted/20 sticky left-0 z-10 border-r">
-                          <div className="space-y-2">
-                            <div className="font-bold text-xl text-center">{instituto.codigo}</div>
-                            <div className="text-sm text-muted-foreground leading-tight text-center">{instituto.nome}</div>
-                            <div className="flex justify-center">
-                              <Badge variant="outline" className="text-xs">
-                                {labelTurno[instituto.turno]}
-                              </Badge>
-                            </div>
-                          </div>
-                        </TableCell>
-                        {diasSemana.map(dia => {
-                          const { projetado, vendeu } = getCelulaData(instituto.codigo, dia);
-                          const isEditing = editingCell?.instituto === instituto.codigo && editingCell?.dia === dia;
-
-                          return (
-                            <TableCell key={dia} className="text-center p-2 min-w-40">
-                              <CelulaVenda
-                                instituto={instituto}
-                                dia={dia}
-                                projetado={projetado}
-                                vendeu={vendeu}
-                                isEditing={isEditing}
-                                onEdit={() => setEditingCell({ instituto: instituto.codigo, dia })}
-                                onSave={(projetado, vendeu) => handleSaveVenda(instituto.id, dia, instituto.turno, projetado, vendeu)}
-                                onCancel={() => setEditingCell(null)}
-                                isUpdating={isUpdating}
-                              />
-                            </TableCell>
-                          );
-                        })}
+                        {diasSemana.map(dia => (
+                          <TableHead key={dia} className="text-center min-w-40 bg-muted/30">
+                            <div className="font-medium text-lg">{labelDia[dia]}</div>
+                            <div className="text-xs text-muted-foreground">Proj | Vendeu</div>
+                          </TableHead>
+                        ))}
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+                    </TableHeader>
+                    <TableBody>
+                      {institutos.map(instituto => (
+                        <TableRow key={instituto.id} className="hover:bg-muted/30">
+                          <TableCell className="font-medium bg-muted/20 sticky left-0 z-10 border-r">
+                            <div className="space-y-2">
+                              <div className="font-bold text-xl text-center">{instituto.codigo}</div>
+                              <div className="text-sm text-muted-foreground leading-tight text-center">{instituto.nome}</div>
+                              <div className="flex justify-center">
+                                <Badge variant="outline" className="text-xs">
+                                  {labelTurno[instituto.turno]}
+                                </Badge>
+                              </div>
+                            </div>
+                          </TableCell>
+                          {diasSemana.map(dia => {
+                            const { projetado, vendeu } = getCelulaData(instituto.codigo, dia);
+                            const isEditing = editingCell?.instituto === instituto.codigo && editingCell?.dia === dia;
+
+                            return (
+                              <TableCell key={dia} className="text-center p-2 min-w-40">
+                                <CelulaVenda
+                                  instituto={instituto}
+                                  dia={dia}
+                                  projetado={projetado}
+                                  vendeu={vendeu}
+                                  isEditing={isEditing}
+                                  onEdit={() => setEditingCell({ instituto: instituto.codigo, dia })}
+                                  onSave={(projetado, vendeu) => handleSaveVenda(instituto.id, dia, instituto.turno, projetado, vendeu)}
+                                  onCancel={() => setEditingCell(null)}
+                                  isUpdating={isUpdating}
+                                />
+                              </TableCell>
+                            );
+                          })}
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
