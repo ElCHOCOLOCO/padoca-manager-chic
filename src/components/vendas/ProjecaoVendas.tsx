@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, TrendingUp, TrendingDown, Target, BarChart3, RefreshCw, Save, X, History, Calendar } from "lucide-react";
+import TesteConexao from "./TesteConexao";
 
 type InstitutoVenda = {
   id: string;
@@ -172,6 +173,31 @@ function ProjecaoVendas() {
     console.log("📊 ProjecaoVendas: Iniciando carregamento de dados");
     setLoading(true);
     try {
+      // TESTE DE CONEXÃO - Verificar se o usuário está autenticado
+      console.log("🔐 ProjecaoVendas: Verificando autenticação...");
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      console.log("👤 ProjecaoVendas: Usuário atual:", user ? "Autenticado" : "Não autenticado", user?.id);
+      if (authError) {
+        console.error('❌ ProjecaoVendas: Erro de autenticação:', authError);
+      }
+
+      // TESTE DE CONEXÃO - Verificar se conseguimos acessar a tabela
+      console.log("🔍 ProjecaoVendas: Testando acesso à tabela institutos_vendas...");
+      const { data: testData, error: testError, count } = await supabase
+        .from('institutos_vendas')
+        .select('*', { count: 'exact', head: true });
+
+      console.log("📊 ProjecaoVendas: Teste de acesso - count:", count, "error:", testError);
+      
+      if (testError) {
+        console.error('❌ ProjecaoVendas: Erro no teste de acesso:', testError);
+        toast({ 
+          title: "Erro de Acesso", 
+          description: `Não foi possível acessar a tabela: ${testError.message}` 
+        });
+        return;
+      }
+
       // Carregar institutos
       console.log("🔍 ProjecaoVendas: Carregando institutos...");
       const { data: institutosData, error: institutosError } = await supabase
@@ -185,6 +211,7 @@ function ProjecaoVendas() {
         setInstitutos([]);
       } else {
         console.log('✅ ProjecaoVendas: Institutos carregados:', institutosData?.length || 0);
+        console.log('📋 ProjecaoVendas: Dados dos institutos:', institutosData);
         setInstitutos(institutosData || []);
       }
 
@@ -398,7 +425,7 @@ function ProjecaoVendas() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="matriz" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
             Matriz de Vendas
@@ -410,6 +437,10 @@ function ProjecaoVendas() {
           <TabsTrigger value="dashboard" className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4" />
             Dashboard
+          </TabsTrigger>
+          <TabsTrigger value="teste" className="flex items-center gap-2">
+            <Calendar className="h-4 w-4" />
+            Teste
           </TabsTrigger>
         </TabsList>
 
@@ -596,6 +627,10 @@ function ProjecaoVendas() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="teste" className="space-y-4">
+          <TesteConexao />
         </TabsContent>
       </Tabs>
     </div>
