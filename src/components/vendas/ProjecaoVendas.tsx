@@ -10,7 +10,6 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, TrendingUp, TrendingDown, Target, BarChart3, RefreshCw, Save, X, History, Calendar } from "lucide-react";
 import TesteConexao from "./TesteConexao";
-import LoginForm from "../auth/LoginForm";
 
 type InstitutoVenda = {
   id: string;
@@ -200,7 +199,6 @@ function ProjecaoVendas() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [dataReferencia, setDataReferencia] = useState(new Date().toISOString().split('T')[0]);
   const [activeTab, setActiveTab] = useState('matriz');
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
 
   // Estados para funcionalidades de análise
   const [analiseOfertaDemanda, setAnaliseOfertaDemanda] = useState<AnaliseOfertaDemanda[]>([]);
@@ -215,31 +213,6 @@ function ProjecaoVendas() {
     console.log("📊 ProjecaoVendas: Iniciando carregamento de dados");
     setLoading(true);
     try {
-      // TESTE DE CONEXÃO - Verificar se o usuário está autenticado
-      console.log("🔐 ProjecaoVendas: Verificando autenticação...");
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      console.log("👤 ProjecaoVendas: Usuário atual:", user ? "Autenticado" : "Não autenticado", user?.id);
-      if (authError) {
-        console.error('❌ ProjecaoVendas: Erro de autenticação:', authError);
-      }
-
-      // TESTE DE CONEXÃO - Verificar se conseguimos acessar a tabela
-      console.log("🔍 ProjecaoVendas: Testando acesso à tabela institutos_vendas...");
-      const { data: testData, error: testError, count } = await supabase
-        .from('institutos_vendas')
-        .select('*', { count: 'exact', head: true });
-
-      console.log("📊 ProjecaoVendas: Teste de acesso - count:", count, "error:", testError);
-      
-      if (testError) {
-        console.error('❌ ProjecaoVendas: Erro no teste de acesso:', testError);
-        toast({ 
-          title: "Erro de Acesso", 
-          description: `Não foi possível acessar a tabela: ${testError.message}` 
-        });
-        return;
-      }
-
       // Carregar institutos
       console.log("🔍 ProjecaoVendas: Carregando institutos...");
       const { data: institutosData, error: institutosError } = await supabase
@@ -253,7 +226,6 @@ function ProjecaoVendas() {
         setInstitutos([]);
       } else {
         console.log('✅ ProjecaoVendas: Institutos carregados:', institutosData?.length || 0);
-        console.log('📋 ProjecaoVendas: Dados dos institutos:', institutosData);
         setInstitutos(institutosData || []);
       }
 
@@ -304,26 +276,11 @@ function ProjecaoVendas() {
     }
   }, [dataReferencia]);
 
-  // Verificar autenticação
+  // Carregar dados ao montar o componente
   useEffect(() => {
-    const checkAuth = async () => {
-      console.log("🔐 ProjecaoVendas: Verificando autenticação...");
-      const { data: { user } } = await supabase.auth.getUser();
-      const isAuth = !!user;
-      setIsAuthenticated(isAuth);
-      console.log("🔐 ProjecaoVendas: Status de autenticação:", isAuth);
-    };
-    
-    checkAuth();
-  }, []);
-
-  useEffect(() => {
-    console.log("🔄 ProjecaoVendas: useEffect loadData - isAuthenticated:", isAuthenticated);
-    if (isAuthenticated) {
-      console.log("🔄 ProjecaoVendas: useEffect executado (usuário autenticado)");
-      loadData();
-    }
-  }, [loadData, isAuthenticated]);
+    console.log("🔄 ProjecaoVendas: useEffect executado");
+    loadData();
+  }, [loadData]);
 
   // Carregar análise de oferta e demanda
   const loadAnaliseOfertaDemanda = useCallback(async () => {
@@ -586,32 +543,6 @@ function ProjecaoVendas() {
 
   console.log("✅ ProjecaoVendas: Renderizando componente principal");
 
-  // Se ainda não verificou a autenticação, mostrar loading
-  if (isAuthenticated === null) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <div className="flex items-center gap-2">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-          <div className="text-lg">Verificando autenticação...</div>
-        </div>
-      </div>
-    );
-  }
-
-  // Se não está autenticado, mostrar formulário de login
-  if (!isAuthenticated) {
-    return (
-      <div className="space-y-6">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold mb-2">Vendas</h1>
-          <p className="text-muted-foreground">Faça login para acessar o sistema de vendas</p>
-        </div>
-        <LoginForm />
-      </div>
-    );
-  }
-
-  // Se está autenticado, mostrar o conteúdo normal
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
