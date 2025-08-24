@@ -3,13 +3,11 @@ import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "@/config";
 
-const SUPABASE_URL_FALLBACK = "https://pvexerjrbqzrkbzqswxf.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY_FALLBACK = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB2ZXhlcmpyYnF6cmtienFzd3hmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI0MzQ5OTcsImV4cCI6MjA2ODAxMDk5N30.JU2Fs8eluZddU1iSdCz5v3uhZglGkfuDawTu23iFsYc";
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  throw new Error("Supabase envs missing: set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY");
+}
 
-const url = SUPABASE_URL || SUPABASE_URL_FALLBACK;
-const key = SUPABASE_ANON_KEY || SUPABASE_PUBLISHABLE_KEY_FALLBACK;
-
-export const supabase = createClient<Database>(url, key, {
+export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     storage: localStorage,
     persistSession: true,

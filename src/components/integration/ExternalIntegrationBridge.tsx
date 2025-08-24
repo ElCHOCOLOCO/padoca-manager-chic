@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 import { CreateEntryPayload, DeleteEntryPayload, ExtMessage, HostContext, MSG, Periodo, RequestEntriesPayload, UpdateEntryPayload } from "./types";
 import { DEFAULT_INSTITUTE_ID } from "@/config";
 
@@ -73,15 +72,15 @@ export default function ExternalIntegrationBridge({
             const prd = p.period ?? ctx.period;
             const start = p.start ?? ctx.range.start;
             const end = p.end ?? ctx.range.end;
-            const { data, error } = await supabase
-              .from("entradas")
-              .select("*")
-              .eq("period", prd)
-              .eq("institute_id", ctx.instituteId ?? DEFAULT_INSTITUTE_ID)
-              .gte("entry_date", start)
-              .lte("entry_date", end)
-              .order("entry_date", { ascending: true });
-            if (error) throw error;
+            const qs = new URLSearchParams({
+              period: String(prd),
+              start: String(start),
+              end: String(end),
+              instituteId: String(ctx.instituteId ?? DEFAULT_INSTITUTE_ID),
+            }).toString();
+            const resp = await fetch(`/api/entries?${qs}`);
+            if (!resp.ok) throw new Error(`Falha ao buscar entradas (${resp.status})`);
+            const data = await resp.json();
             post({ type: MSG.ENTRIES_DATA, payload: data });
             break;
           }
@@ -95,22 +94,23 @@ export default function ExternalIntegrationBridge({
               amount: p.amount,
               description: p.description ?? null,
             };
-            const { data, error } = await supabase.from("entradas").insert(payload).select();
-            if (error) throw error;
-            post({ type: MSG.ENTRY_CREATED, payload: data?.[0] });
+            const resp = await fetch(`/api/entries`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            if (!resp.ok) throw new Error(`Falha ao criar (${resp.status})`);
+            const created = await resp.json();
+            post({ type: MSG.ENTRY_CREATED, payload: created });
             break;
           }
           case MSG.UPDATE_ENTRY: {
             const p = (msg.payload || {}) as UpdateEntryPayload;
-            const { error } = await supabase.from("entradas").update({ amount: p.amount, description: p.description }).eq("id", p.id).select();
-            if (error) throw error;
+            const resp = await fetch(`/api/entries/${encodeURIComponent(p.id)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount: p.amount, description: p.description }) });
+            if (!resp.ok) throw new Error(`Falha ao atualizar (${resp.status})`);
             post({ type: MSG.ENTRY_UPDATED, payload: { id: p.id } });
             break;
           }
           case MSG.DELETE_ENTRY: {
             const p = (msg.payload || {}) as DeleteEntryPayload;
-            const { error } = await supabase.from("entradas").delete().eq("id", p.id);
-            if (error) throw error;
+            const resp = await fetch(`/api/entries/${encodeURIComponent(p.id)}`, { method: 'DELETE' });
+            if (!resp.ok) throw new Error(`Falha ao excluir (${resp.status})`);
             post({ type: MSG.ENTRY_DELETED, payload: { id: p.id } });
             break;
           }
