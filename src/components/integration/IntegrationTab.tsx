@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 import ExternalIntegrationBridge from "@/components/integration/ExternalIntegrationBridge";
 import type { Periodo } from "@/components/integration/types";
 import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, format } from "date-fns";
@@ -17,15 +16,10 @@ export default function IntegrationTab() {
   const [period, setPeriod] = useState<Periodo>("daily");
   const [date, setDate] = useState<string>(() => new Date().toISOString().slice(0,10));
   const [show, setShow] = useState(false);
+  const [connecting, setConnecting] = useState(false);
   const [userId] = useState<string | null>(DEFAULT_USER_ID);
   const [instituteId] = useState<string | null>(DEFAULT_INSTITUTE_ID);
-
-  // Opcional: verificar conexão do Supabase
-  useEffect(() => {
-    (async () => {
-      try { await supabase.from("entradas").select("id").limit(1); } catch { /* ignore */ }
-    })();
-  }, []);
+  const preflightRef = useRef<HTMLIFrameElement | null>(null);
 
   const range = useMemo(() => {
     const base = new Date(date + "T00:00:00");
@@ -43,6 +37,63 @@ export default function IntegrationTab() {
   const saveUrl = () => {
     localStorage.setItem(STORAGE_KEY_URL, url.trim());
     toast({ title: "URL salva" });
+  };
+
+  const handleConnect = async () => {
+    if (!url) return toast({ title: 'Informe a URL'});
+    setConnecting(true);
+    const testUrl = (() => {
+      try {
+        const u = new URL(url, window.location.origin);
+        u.searchParams.set('period', period);
+        u.searchParams.set('start', range.start);
+        u.searchParams.set('end', range.end);
+        u.searchParams.set('user_id', DEFAULT_USER_ID);
+        u.searchParams.set('institute_id', DEFAULT_INSTITUTE_ID);
+        return u.toString();
+      } catch { return url; }
+    })();
+
+    const iframe = document.createElement('iframe');
+    preflightRef.current = iframe;
+    iframe.style.position = 'fixed';
+    iframe.style.left = '-9999px';
+    iframe.style.width = '1px';
+    iframe.style.height = '1px';
+    iframe.sandbox.add("allow-scripts");
+    iframe.sandbox.add("allow-forms");
+    iframe.sandbox.add("allow-same-origin");
+    iframe.src = testUrl;
+    document.body.appendChild(iframe);
+
+    let done = false;
+    const origin = (() => { try { return new URL(url, window.location.origin).origin; } catch { return '*'; } })();
+
+    const onMsg = (e: MessageEvent) => {
+      if (origin !== '*' && e.origin !== origin) return;
+      const t = (e.data||{}).type;
+      if (t === 'EXT_INIT' || t === 'HOST_READY' || t === 'CONTEXT_DATA') {
+        done = true;
+        cleanup();
+        setShow(true);
+        setConnecting(false);
+        toast({ title: 'Conectado' });
+      }
+    };
+    window.addEventListener('message', onMsg);
+
+    const cleanup = () => {
+      window.removeEventListener('message', onMsg);
+      try { preflightRef.current?.remove(); } catch {}
+      preflightRef.current = null;
+    };
+
+    setTimeout(() => {
+      if (done) return;
+      cleanup();
+      setConnecting(false);
+      toast({ title: 'Falha na conexão', description: 'Não houve handshake do embed.' });
+    }, 4000);
   };
 
   return (
@@ -87,10 +138,7 @@ export default function IntegrationTab() {
             </p>
           </div>
           <div className="col-span-2 flex items-end gap-2">
-            <Button onClick={()=> {
-              if (!url) return toast({ title: 'Informe a URL'});
-              setShow(true);
-            }}>Integrar na página</Button>
+            <Button onClick={handleConnect} disabled={!url || connecting}>{connecting ? 'Conectando…' : 'Conectar'}</Button>
           </div>
         </CardContent>
       </Card>
@@ -103,6 +151,8 @@ export default function IntegrationTab() {
           userId={userId}
           instituteId={instituteId}
           onClose={()=> setShow(false)}
+          onConnected={()=> toast({ title: 'Handshake ok' })}
+          onError={(m)=> toast({ title: 'Erro integração', description: m })}
         />
       )}
     </div>

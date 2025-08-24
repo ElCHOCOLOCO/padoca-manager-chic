@@ -31,6 +31,8 @@ export default function ExternalIntegrationBridge({
   userId,
   instituteId,
   onClose,
+  onConnected,
+  onError,
 }: {
   url: string;
   period: Periodo;
@@ -38,6 +40,8 @@ export default function ExternalIntegrationBridge({
   userId: string | null;
   instituteId: string | null;
   onClose: () => void;
+  onConnected?: () => void;
+  onError?: (message: string) => void;
 }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [connected, setConnected] = useState(false);
@@ -60,6 +64,7 @@ export default function ExternalIntegrationBridge({
         switch (msg.type) {
           case MSG.EXT_INIT: {
             setConnected(true);
+            onConnected?.();
             post({ type: MSG.HOST_READY, payload: ctx });
             break;
           }
@@ -118,8 +123,10 @@ export default function ExternalIntegrationBridge({
             break;
         }
       } catch (err: any) {
-        post({ type: MSG.ERROR, payload: { message: err.message } });
-        toast({ title: "Integração: erro", description: err.message });
+        const message = err?.message || 'Erro desconhecido';
+        onError?.(message);
+        post({ type: MSG.ERROR, payload: { message } });
+        toast({ title: "Integração: erro", description: message });
       }
     };
 
