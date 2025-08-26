@@ -12,7 +12,7 @@ import { DEFAULT_INSTITUTE_ID, DEFAULT_USER_ID } from "@/config";
 const STORAGE_KEY_URL = "integration_external_url";
 
 export default function IntegrationTab() {
-  const [url, setUrl] = useState<string>(() => localStorage.getItem(STORAGE_KEY_URL) || "/plugin/marx-vendas");
+  const [url, setUrl] = useState<string>(() => localStorage.getItem(STORAGE_KEY_URL) || "https://v0-vendedor-app.vercel.app/embed");
   const [period, setPeriod] = useState<Periodo>("daily");
   const [date, setDate] = useState<string>(() => new Date().toISOString().slice(0,10));
   const [show, setShow] = useState(false);

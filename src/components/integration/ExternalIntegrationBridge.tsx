@@ -45,6 +45,7 @@ export default function ExternalIntegrationBridge({
 }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [connected, setConnected] = useState(false);
+  const [dailyCard, setDailyCard] = useState<{ date: string; paes_units: number; salgados_units: number; repasse_amount: number } | null>(null);
   const targetOrigin = useMemo(() => getOrigin(url), [url]);
 
   const ctx: HostContext = useMemo(() => ({
@@ -87,6 +88,16 @@ export default function ExternalIntegrationBridge({
             if (!resp.ok) throw new Error(`Falha ao buscar entradas (${resp.status})`);
             const data = await resp.json();
             post({ type: MSG.ENTRIES_DATA, payload: data });
+            break;
+          }
+          case MSG.DAILY_CARD: {
+            const p = (msg.payload || {}) as { date?: string; paes_units?: number; salgados_units?: number; repasse_amount?: number };
+            setDailyCard({
+              date: String(p.date || ctx.range.start),
+              paes_units: Number(p.paes_units || 0),
+              salgados_units: Number(p.salgados_units || 0),
+              repasse_amount: Number(p.repasse_amount || 0),
+            });
             break;
           }
           case MSG.CREATE_ENTRY: {
@@ -154,6 +165,22 @@ export default function ExternalIntegrationBridge({
         </div>
       </CardHeader>
       <CardContent>
+        {dailyCard && (
+          <div className="mb-3 grid md:grid-cols-3 gap-2 text-sm">
+            <div className="rounded border p-2">
+              <div className="text-muted-foreground">Pães (unid)</div>
+              <div className="font-bold text-lg">{dailyCard.paes_units}</div>
+            </div>
+            <div className="rounded border p-2">
+              <div className="text-muted-foreground">Salgados (unid)</div>
+              <div className="font-bold text-lg">{dailyCard.salgados_units}</div>
+            </div>
+            <div className="rounded border p-2">
+              <div className="text-muted-foreground">Repasse (R$)</div>
+              <div className="font-bold text-lg">R$ {dailyCard.repasse_amount.toFixed(2)}</div>
+            </div>
+          </div>
+        )}
         <div className="text-xs text-muted-foreground mb-2">Destino: {getOrigin(url)}</div>
         <iframe
           ref={iframeRef}
