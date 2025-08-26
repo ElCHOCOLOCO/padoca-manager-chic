@@ -10,8 +10,8 @@
       ]
     }
   ],
-  "routes": [
-    { "src": "/api/entries", "dest": "/api/entries/index.ts" },
-    { "src": "/api/entries/(?<id>[^/]+)$", "dest": "/api/entries/[id].ts" }
+  "rewrites": [
+    { "source": "/api/entries", "destination": "/api/entries/index.ts" },
+    { "source": "/api/entries/:id", "destination": "/api/entries/[id].ts" }
   ]
 }
