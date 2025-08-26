@@ -142,24 +142,14 @@ function IntegracaoVendas() {
   const receberDadosMarxVendas = async () => {
     setLoadingSync(true);
     try {
-      const { data: vendasMarxData, error: vendasMarxError } = await supabase
-        .from('projecoes_vendas')
-        .select(`
-          vendas_reais,
-          institutos_vendas!inner(codigo)
-        `)
-        .eq('data_referencia', dataSelecionada);
-      if (vendasMarxError) throw vendasMarxError;
-      const totalVendas = (vendasMarxData || []).reduce((total, item) => total + (item.vendas_reais || 0), 0);
-      const paesVendidos = Math.floor(totalVendas * 0.4);
-      const salgadosVendidos = Math.floor(totalVendas * 0.3);
-      const repasseEstimado = totalVendas * 2;
-      const { error: integracaoError } = await supabase
-        .from('vendas_detalhadas')
-        .insert([{ data: dataSelecionada, paes: paesVendidos, salgados: salgadosVendidos, chocolates: 0, refrigerantes: 0, repasse: repasseEstimado, lucro_dia: repasseEstimado, total_vendas: totalVendas, observacoes: `Recebido via simulação (${vendasMarxData?.length || 0} registros)` }]);
-      if (integracaoError) throw integracaoError;
+      const resp = await fetch('/api/integration/receive', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ date: dataSelecionada }) });
+      if (!resp.ok) {
+        const err = await resp.json().catch(()=>({ error: `HTTP ${resp.status}` }));
+        throw new Error(err.error || `HTTP ${resp.status}`);
+      }
+      const r = await resp.json();
       setUltimaSincronizacao(new Date().toLocaleString('pt-BR'));
-      toast({ title: "Dados Recebidos!", description: `Marx Vendas: repasse R$ ${repasseEstimado.toFixed(2)}` });
+      toast({ title: 'Dados Recebidos!', description: `Repasse R$ ${Number(r.repasseEstimado||0).toFixed(2)}` });
       loadVendasData();
     } catch (error: any) {
       toast({ title: "Erro ao receber dados", description: error.message, variant: "destructive" });
