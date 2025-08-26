@@ -12,7 +12,9 @@
 	],
 	"rewrites": [
 		{ "source": "/api/entries", "destination": "/api/entries/index.ts" },
-		{ "source": "/api/entries/:id", "destination": "/api/entries/[id].ts" }
+		{ "source": "/api/entries/:id", "destination": "/api/entries/[id].ts" },
+		{ "source": "/api/integration/receive", "destination": "/api/integration/receive.ts" },
+		{ "source": "/api/cron/daily-card", "destination": "/api/cron/daily-card.ts" }
 	],
 	"crons": [
 		{ "path": "/api/cron/daily-card", "schedule": "0 23 * * *" }
