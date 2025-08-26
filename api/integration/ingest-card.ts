@@ -29,8 +29,6 @@ export default async function handler(req: Request): Promise<Response> {
     return new Response(JSON.stringify({ error: 'Missing SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY' }), { status: 500, headers: { 'Content-Type': 'application/json', ...cors } });
   }
 
-  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
-
   try {
     const body = await req.json().catch(()=> ({}));
     const date = String(body.p_date || body.date || '').slice(0, 10) || new Date().toISOString().slice(0,10);
@@ -47,12 +45,25 @@ export default async function handler(req: Request): Promise<Response> {
       description: `Card diário: pães ${total_paes}, salgados ${total_salgados}`,
     } as any;
 
-    const { error } = await supabase.from('entradas').insert([insertPayload]);
-    if (error) {
-      return new Response(JSON.stringify({ ok: false, error: error.message }), { status: 200, headers: { 'Content-Type': 'application/json', ...cors } });
+    const restUrl = `${SUPABASE_URL}/rest/v1/entradas`;
+    const resp = await fetch(restUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_SERVICE_ROLE_KEY,
+        'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        'Prefer': 'return=representation'
+      },
+      body: JSON.stringify([insertPayload])
+    });
+
+    if (!resp.ok) {
+      const text = await resp.text();
+      return new Response(JSON.stringify({ ok: false, error: `REST ${resp.status}: ${text}` }), { status: 200, headers: { 'Content-Type': 'application/json', ...cors } });
     }
 
-    return new Response(JSON.stringify({ ok: true, date, total_paes, total_salgados, total_repasse }), { status: 200, headers: { 'Content-Type': 'application/json', ...cors } });
+    const data = await resp.json().catch(()=>null);
+    return new Response(JSON.stringify({ ok: true, date, total_paes, total_salgados, total_repasse, inserted: data }), { status: 200, headers: { 'Content-Type': 'application/json', ...cors } });
   } catch (e: any) {
     return new Response(JSON.stringify({ ok: false, error: e?.message || 'Internal error' }), { status: 200, headers: { 'Content-Type': 'application/json', ...cors } });
   }
