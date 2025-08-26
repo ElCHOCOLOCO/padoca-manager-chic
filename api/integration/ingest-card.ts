@@ -1,5 +1,13 @@
 import { createClient } from '@supabase/supabase-js';
 
+function setCors(res: any, origin?: string) {
+  const isAllowed = !!origin && (origin === 'https://v0-vendedor-app.vercel.app' || origin.endsWith('.vercel.app'));
+  res.setHeader('Access-Control-Allow-Origin', isAllowed ? origin : 'https://v0-vendedor-app.vercel.app');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, apikey');
+  res.setHeader('Vary', 'Origin');
+}
+
 function json(res: any, status: number, body: any) {
   res.statusCode = status;
   res.setHeader('Content-Type', 'application/json');
@@ -7,8 +15,13 @@ function json(res: any, status: number, body: any) {
 }
 
 export default async function handler(req: any, res: any) {
+  setCors(res, req.headers?.origin as string | undefined);
+  if (req.method === 'OPTIONS') {
+    res.statusCode = 204;
+    return res.end();
+  }
   if (req.method !== 'POST') {
-    res.setHeader('Allow', 'POST');
+    res.setHeader('Allow', 'POST, OPTIONS');
     return json(res, 405, { error: 'Method Not Allowed' });
   }
 
