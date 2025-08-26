@@ -6,6 +6,22 @@ function setCors(res, origin) {
   res.setHeader('Vary', 'Origin');
 }
 
+async function readJsonBody(req) {
+  try {
+    if (typeof req.body === 'string') return JSON.parse(req.body || '{}');
+    if (Buffer.isBuffer(req.body)) return JSON.parse(req.body.toString('utf8') || '{}');
+    if (req.body && typeof req.body === 'object') return req.body; // already parsed
+  } catch {}
+  const chunks = [];
+  return await new Promise((resolve) => {
+    req.on('data', (c) => chunks.push(c));
+    req.on('end', () => {
+      try { resolve(JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}')); } catch { resolve({}); }
+    });
+    req.on('error', () => resolve({}));
+  });
+}
+
 export default async function handler(req, res) {
   try {
     setCors(res, req.headers?.origin);
@@ -18,7 +34,7 @@ export default async function handler(req, res) {
       res.statusCode = 500; return res.end(JSON.stringify({ error: 'Missing SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY' }));
     }
 
-    const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
+    const body = await readJsonBody(req);
     const date = String(body.p_date || body.date || '').slice(0, 10) || new Date().toISOString().slice(0,10);
     const total_paes = Number(body.p_total_paes ?? body.total_paes ?? 0);
     const total_salgados = Number(body.p_total_salgados ?? body.total_salgados ?? 0);
