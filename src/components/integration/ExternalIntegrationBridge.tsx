@@ -98,6 +98,24 @@ export default function ExternalIntegrationBridge({
               salgados_units: Number(p.salgados_units || 0),
               repasse_amount: Number(p.repasse_amount || 0),
             });
+            // Persist asynchronously (best-effort) to Supabase if envs exist
+            try {
+              const base = (window as any).VITE_SUPABASE_URL || (import.meta as any).env?.VITE_SUPABASE_URL;
+              if (base) {
+                fetch('/api/entries', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    user_id: ctx.userId ?? '00000000-0000-0000-0000-000000000001',
+                    institute_id: ctx.instituteId ?? DEFAULT_INSTITUTE_ID,
+                    entry_date: String(p.date || ctx.range.start),
+                    period: 'daily',
+                    amount: Number(p.repasse_amount || 0),
+                    description: `Card diário: pães ${Number(p.paes_units||0)}, salgados ${Number(p.salgados_units||0)}`,
+                  })
+                }).catch(()=>{});
+              }
+            } catch {}
             break;
           }
           case MSG.CREATE_ENTRY: {

@@ -96,6 +96,14 @@ export default function IntegrationTab() {
     }, 4000);
   };
 
+  // Auto-connect on mount if URL is present
+  useEffect(() => {
+    if (!show && url) {
+      void handleConnect();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <div className="space-y-6">
       <Card>
