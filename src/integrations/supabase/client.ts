@@ -4,7 +4,7 @@ import type { Database } from './types';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "@/config";
 
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  throw new Error("Supabase envs missing: set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY");
+  throw new Error("Supabase envs missing: set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in Vercel (Project Settings > Environment Variables) and redeploy.");
 }
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
