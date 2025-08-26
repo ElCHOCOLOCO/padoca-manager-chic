@@ -43,6 +43,7 @@ export const MSG = {
   DELETE_ENTRY: "DELETE_ENTRY",
   ENTRY_DELETED: "ENTRY_DELETED",
   ERROR: "ERROR",
+  DAILY_CARD: "DAILY_CARD",
 } as const;
 
 export type MessageType = typeof MSG[keyof typeof MSG];
