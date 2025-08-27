@@ -22,10 +22,11 @@ async function readJsonBody(req) {
   });
 }
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   try {
     setCors(res, req.headers?.origin);
     if (req.method === 'OPTIONS') { res.statusCode = 204; return res.end(); }
+    if (req.method === 'GET') { res.statusCode = 200; return res.end(JSON.stringify({ ok: true, route: 'ingest-card' })); }
     if (req.method !== 'POST') { res.statusCode = 405; return res.end(JSON.stringify({ error: 'Method Not Allowed' })); }
 
     const SUPABASE_URL = process.env.SUPABASE_URL;
