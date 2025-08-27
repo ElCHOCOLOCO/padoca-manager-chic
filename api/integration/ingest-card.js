@@ -1,4 +1,4 @@
-const https = require('https');
+import https from 'https';
 
 function setCors(res, origin) {
   const allowed = origin && (origin === 'https://v0-vendedor-app.vercel.app' || /\.vercel\.app$/.test(origin));
@@ -12,7 +12,7 @@ async function readJsonBody(req) {
   try {
     if (typeof req.body === 'string') return JSON.parse(req.body || '{}');
     if (Buffer.isBuffer(req.body)) return JSON.parse(req.body.toString('utf8') || '{}');
-    if (req.body && typeof req.body === 'object') return req.body; // already parsed
+    if (req.body && typeof req.body === 'object') return req.body;
   } catch {}
   const chunks = [];
   return await new Promise((resolve) => {
@@ -52,7 +52,7 @@ function postJson(urlString, headers, payload) {
   });
 }
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   try {
     setCors(res, req.headers?.origin);
     if (req.method === 'OPTIONS') { res.statusCode = 204; return res.end(); }
