@@ -1,3 +1,5 @@
+const https = require('https');
+
 function setCors(res, origin) {
   const allowed = origin && (origin === 'https://v0-vendedor-app.vercel.app' || /\.vercel\.app$/.test(origin));
   res.setHeader('Access-Control-Allow-Origin', allowed ? origin : '*');
@@ -19,6 +21,34 @@ async function readJsonBody(req) {
       try { resolve(JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}')); } catch { resolve({}); }
     });
     req.on('error', () => resolve({}));
+  });
+}
+
+function postJson(urlString, headers, payload) {
+  return new Promise((resolve) => {
+    try {
+      const url = new URL(urlString);
+      const opts = {
+        hostname: url.hostname,
+        path: url.pathname + (url.search || ''),
+        port: url.port || 443,
+        method: 'POST',
+        headers,
+      };
+      const req = https.request(opts, (res) => {
+        const chunks = [];
+        res.on('data', (d) => chunks.push(d));
+        res.on('end', () => {
+          const body = Buffer.concat(chunks).toString('utf8');
+          resolve({ status: res.statusCode || 0, body });
+        });
+      });
+      req.on('error', (e) => resolve({ status: 0, body: String(e?.message || e) }));
+      req.write(JSON.stringify(payload));
+      req.end();
+    } catch (e) {
+      resolve({ status: 0, body: String(e?.message || e) });
+    }
   });
 }
 
@@ -50,24 +80,24 @@ module.exports = async function handler(req, res) {
       description: `Card diário: pães ${total_paes}, salgados ${total_salgados}`,
     }];
 
-    const resp = await fetch(`${SUPABASE_URL}/rest/v1/entradas`, {
-      method: 'POST',
-      headers: {
+    const { status, body: respBody } = await postJson(
+      `${SUPABASE_URL}/rest/v1/entradas`,
+      {
         'Content-Type': 'application/json',
         'apikey': SUPABASE_SERVICE_ROLE_KEY,
         'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
         'Prefer': 'return=representation'
       },
-      body: JSON.stringify(insertPayload)
-    });
+      insertPayload
+    );
 
-    if (!resp.ok) {
-      const text = await resp.text();
-      res.statusCode = 200; return res.end(JSON.stringify({ ok: false, error: `REST ${resp.status}: ${text}` }));
+    if (status < 200 || status >= 300) {
+      res.statusCode = 200; return res.end(JSON.stringify({ ok: false, error: `REST ${status}: ${respBody}` }));
     }
 
-    const data = await resp.json().catch(()=>null);
-    res.statusCode = 200; return res.end(JSON.stringify({ ok: true, date, total_paes, total_salgados, total_repasse, inserted: data }));
+    let inserted = null;
+    try { inserted = JSON.parse(respBody); } catch {}
+    res.statusCode = 200; return res.end(JSON.stringify({ ok: true, date, total_paes, total_salgados, total_repasse, inserted }));
   } catch (e) {
     res.statusCode = 200; return res.end(JSON.stringify({ ok: false, error: e?.message || 'Internal error' }));
   }
