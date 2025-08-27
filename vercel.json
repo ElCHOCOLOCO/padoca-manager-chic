@@ -20,8 +20,8 @@
 		}
 	],
 	"rewrites": [
-		{ "source": "/api/entries", "destination": "/api/entries/index.ts" },
-		{ "source": "/api/entries/:id", "destination": "/api/entries/[id].ts" },
+		{ "source": "/api/entries", "destination": "/api/entries/index.js" },
+		{ "source": "/api/entries/:id", "destination": "/api/entries/[id].js" },
 		{ "source": "/api/integration/receive", "destination": "/api/integration/receive.ts" },
 		{ "source": "/api/integration/ingest-card", "destination": "/api/integration/ingest-card.js" },
 		{ "source": "/api/integration/debug", "destination": "/api/integration/debug.js" },
