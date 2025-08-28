@@ -21,7 +21,22 @@ export default function Integracao() {
   const [historico, setHistorico] = useState<Balance[]>([]);
   const [resumo, setResumo] = useState({ total_paes: 0, total_salgados: 0, total_repasse: 0, total_vendas: 0 });
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  function Badge({ ok }: { ok: boolean }) {
+    return (
+      <span style={{
+        display: 'inline-block',
+        padding: '2px 8px',
+        borderRadius: 999,
+        fontSize: 12,
+        background: ok ? '#E6F4EA' : '#FCE8E6',
+        color: ok ? '#137333' : '#A50E0E',
+        border: `1px solid ${ok ? '#B7E1CD' : '#F7B6B2'}`,
+      }}>{ok ? 'Conectado' : 'Offline/Erro'}</span>
+    );
+  }
 
   async function refetch() {
     try {
@@ -60,6 +75,8 @@ export default function Integracao() {
     } catch (e: any) {
       setOnline(false);
       setError(e?.message || 'Falha ao carregar');
+    } finally {
+      setInitialLoading(false);
     }
   }
 
@@ -81,42 +98,62 @@ export default function Integracao() {
     }
   }
 
+  const Skeleton = ({ width = 120 }: { width?: number }) => (
+    <span style={{ display: 'inline-block', width, height: 10, background: '#eee', borderRadius: 6 }} />
+  );
+
   return (
     <div style={{ padding: 16, maxWidth: 900, margin: '0 auto' }}>
       <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 8 }}>Integração - Gestão</h1>
 
-      <div style={{ marginBottom: 12, fontSize: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
-        <strong>Status:</strong> {online ? 'Conectado' : 'Offline/Erro'}
+      <div style={{ marginBottom: 12, fontSize: 14, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <Badge ok={online} />
         <button onClick={handlePull} disabled={loading} style={{ padding: '6px 10px', border: '1px solid #ccc', borderRadius: 6, background: loading ? '#eee' : '#fafafa', cursor: loading ? 'not-allowed' : 'pointer' }}>
           {loading ? 'Recebendo…' : 'Receber agora'}
         </button>
-        {error && <span style={{ color: 'red', marginLeft: 8 }}>{error}</span>}
-        {ultimo && (
-          <div style={{ fontSize: 12, opacity: 0.8 }}>
-            Último: {ultimo.data_date} • Vendas: R$ {Number(ultimo.total_vendas || 0).toFixed(2)} • Repasse: R$ {Number(ultimo.total_repasse || 0).toFixed(2)}
-          </div>
-        )}
+        {error && <span style={{ color: 'red' }}>{error}</span>}
+        <div style={{ fontSize: 12, opacity: 0.8 }}>
+          {initialLoading ? (<Skeleton width={200} />) : ultimo ? (
+            <>Último: {ultimo.data_date} • Vendas: R$ {Number(ultimo.total_vendas || 0).toFixed(2)} • Repasse: R$ {Number(ultimo.total_repasse || 0).toFixed(2)}</>
+          ) : 'Sem dados ainda'}
+        </div>
       </div>
 
       <div style={{ marginBottom: 16 }}>
         <strong>Resumo (últimos 7 dias)</strong>
         <div style={{ fontSize: 14, marginTop: 6 }}>
-          Pães: {resumo.total_paes}
-          {' • '}Salgados: {resumo.total_salgados}
-          {' • '}Repasse: R$ {resumo.total_repasse.toFixed(2)}
-          {' • '}Vendas: R$ {resumo.total_vendas.toFixed(2)}
+          {initialLoading ? (
+            <>
+              <Skeleton width={80} /> <Skeleton width={80} /> <Skeleton width={120} /> <Skeleton width={120} />
+            </>
+          ) : (
+            <>
+              Pães: {resumo.total_paes}
+              {' • '}Salgados: {resumo.total_salgados}
+              {' • '}Repasse: R$ {resumo.total_repasse.toFixed(2)}
+              {' • '}Vendas: R$ {resumo.total_vendas.toFixed(2)}
+            </>
+          )}
         </div>
       </div>
 
       <div>
         <strong>Histórico (10 últimos)</strong>
-        <ul style={{ fontSize: 14, marginTop: 8, lineHeight: 1.6 }}>
-          {(historico || []).map((r, i) => (
-            <li key={i}>
-              {r.data_date} — Pães {r.total_paes} • Salgados {r.total_salgados} • Repasse R$ {Number(r.total_repasse || 0).toFixed(2)} • Vendas R$ {Number(r.total_vendas || 0).toFixed(2)}
-            </li>
-          ))}
-        </ul>
+        {initialLoading ? (
+          <div style={{ marginTop: 8 }}>
+            <div style={{ marginBottom: 6 }}><Skeleton width={280} /></div>
+            <div style={{ marginBottom: 6 }}><Skeleton width={260} /></div>
+            <div style={{ marginBottom: 6 }}><Skeleton width={300} /></div>
+          </div>
+        ) : (
+          <ul style={{ fontSize: 14, marginTop: 8, lineHeight: 1.6 }}>
+            {(historico || []).map((r, i) => (
+              <li key={i}>
+                {r.data_date} — Pães {r.total_paes} • Salgados {r.total_salgados} • Repasse R$ {Number(r.total_repasse || 0).toFixed(2)} • Vendas R$ {Number(r.total_vendas || 0).toFixed(2)}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );
