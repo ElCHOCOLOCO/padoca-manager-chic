@@ -32,6 +32,7 @@ export default function EntradasPanel() {
   const [amount, setAmount] = useState<string>("");
   const [description, setDescription] = useState<string>("");
   const [entries, setEntries] = useState<Entrada[]>([]);
+  const [history, setHistory] = useState<Entrada[]>([]);
   const [loading, setLoading] = useState(false);
   const [extUrl, setExtUrl] = useState<string>(() => localStorage.getItem(STORAGE_KEY_URL) || "/plugin/marx-vendas");
   const [instituteId] = useState<string | null>(DEFAULT_INSTITUTE_ID);
@@ -70,6 +71,7 @@ export default function EntradasPanel() {
       const { data, error } = await q;
       if (error) throw error;
       setEntries((data as any) || []);
+      setHistory([]); // reset session history on new load
     } catch (e: any) {
       toast({ title: "Erro ao carregar entradas", description: e.message });
     } finally {
@@ -114,13 +116,18 @@ export default function EntradasPanel() {
       .eq("id", row.id)
       .select();
     if (error) return toast({ title: "Erro ao atualizar", description: error.message });
-    toast({ title: "Entrada atualizada" });
+    // Move para histórico (UI) e remove da lista atual
+    setEntries((prev) => prev.filter((e) => e.id !== row.id));
+    setHistory((prev) => [{ ...row }, ...prev]);
+    toast({ title: "Entrada salva e movida para histórico" });
   };
 
   const handleDelete = async (id: string) => {
     const { error } = await supabase.from("entradas").delete().eq("id", id);
     if (error) return toast({ title: "Erro ao excluir", description: error.message });
     setEntries((prev) => prev.filter((e) => e.id !== id));
+    // também retire do histórico, caso esteja lá
+    setHistory((prev) => prev.filter((e) => e.id !== id));
     toast({ title: "Entrada removida" });
   };
 
@@ -226,6 +233,36 @@ export default function EntradasPanel() {
           )}
         </CardContent>
       </Card>
+
+      {history.length > 0 && (
+        <Card className="animate-fade-in">
+          <CardHeader>
+            <CardTitle>Histórico (sessão) — itens salvos</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Data</TableHead>
+                  <TableHead>Período</TableHead>
+                  <TableHead>Valor</TableHead>
+                  <TableHead>Descrição</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {history.map((r) => (
+                  <TableRow key={r.id}>
+                    <TableCell className="whitespace-nowrap">{r.entry_date}</TableCell>
+                    <TableCell>{r.period}</TableCell>
+                    <TableCell>R$ {Number(r.amount || 0).toFixed(2)}</TableCell>
+                    <TableCell>{r.description ?? ""}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
