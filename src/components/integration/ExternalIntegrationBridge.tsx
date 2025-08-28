@@ -7,207 +7,204 @@ import { CreateEntryPayload, DeleteEntryPayload, ExtMessage, HostContext, MSG, P
 import { DEFAULT_INSTITUTE_ID } from "@/config";
 
 function getOrigin(url: string | null) {
-  try { return url ? new URL(url).origin : "*"; } catch { return "*"; }
+	try { return url ? new URL(url).origin : "*"; } catch { return "*"; }
 }
 
 function buildUrl(base: string, ctx: HostContext) {
-  try {
-    const u = new URL(base);
-    u.searchParams.set("period", ctx.period);
-    u.searchParams.set("start", ctx.range.start);
-    u.searchParams.set("end", ctx.range.end);
-    if (ctx.userId) u.searchParams.set("user_id", ctx.userId);
-    if (ctx.instituteId) u.searchParams.set("institute_id", ctx.instituteId);
-    return u.toString();
-  } catch {
-    return base;
-  }
+	try {
+		const u = new URL(base);
+		u.searchParams.set("period", ctx.period);
+		u.searchParams.set("start", ctx.range.start);
+		u.searchParams.set("end", ctx.range.end);
+		if (ctx.userId) u.searchParams.set("user_id", ctx.userId);
+		if (ctx.instituteId) u.searchParams.set("institute_id", ctx.instituteId);
+		return u.toString();
+	} catch {
+		return base;
+	}
 }
 
 export default function ExternalIntegrationBridge({
-  url,
-  period,
-  dateRange,
-  userId,
-  instituteId,
-  onClose,
-  onConnected,
-  onError,
+	url,
+	period,
+	dateRange,
+	userId,
+	instituteId,
+	onClose,
+	onConnected,
+	onError,
 }: {
-  url: string;
-  period: Periodo;
-  dateRange: { start: string; end: string };
-  userId: string | null;
-  instituteId: string | null;
-  onClose: () => void;
-  onConnected?: () => void;
-  onError?: (message: string) => void;
+	url: string;
+	period: Periodo;
+	dateRange: { start: string; end: string };
+	userId: string | null;
+	instituteId: string | null;
+	onClose: () => void;
+	onConnected?: () => void;
+	onError?: (message: string) => void;
 }) {
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-  const [connected, setConnected] = useState(false);
-  const [dailyCard, setDailyCard] = useState<{ date: string; paes_units: number; salgados_units: number; repasse_amount: number } | null>(null);
-  const targetOrigin = useMemo(() => getOrigin(url), [url]);
+	const iframeRef = useRef<HTMLIFrameElement>(null);
+	const [connected, setConnected] = useState(false);
+	const [dailyCard, setDailyCard] = useState<{ date: string; paes_units: number; salgados_units: number; repasse_amount: number } | null>(null);
+	const targetOrigin = useMemo(() => getOrigin(url), [url]);
 
-  const ctx: HostContext = useMemo(() => ({
-    userId,
-    instituteId,
-    period,
-    range: dateRange,
-  }), [userId, instituteId, period, dateRange]);
+	const ctx: HostContext = useMemo(() => ({
+		userId,
+		instituteId,
+		period,
+		range: dateRange,
+	}), [userId, instituteId, period, dateRange]);
 
-  useEffect(() => {
-    const handler = async (e: MessageEvent) => {
-      if (targetOrigin !== "*" && e.origin !== targetOrigin) return;
-      const msg = e.data as ExtMessage;
-      if (!msg || !msg.type) return;
+	useEffect(() => {
+		const handler = async (e: MessageEvent) => {
+			if (targetOrigin !== "*" && e.origin !== targetOrigin) return;
+			const msg = e.data as ExtMessage;
+			if (!msg || !msg.type) return;
 
-      try {
-        switch (msg.type) {
-          case MSG.EXT_INIT: {
-            setConnected(true);
-            onConnected?.();
-            post({ type: MSG.HOST_READY, payload: ctx });
-            break;
-          }
-          case MSG.REQUEST_CONTEXT: {
-            post({ type: MSG.CONTEXT_DATA, payload: ctx });
-            break;
-          }
-          case MSG.REQUEST_ENTRIES: {
-            const p = (msg.payload || {}) as RequestEntriesPayload;
-            const prd = p.period ?? ctx.period;
-            const start = p.start ?? ctx.range.start;
-            const end = p.end ?? ctx.range.end;
-            const qs = new URLSearchParams({
-              period: String(prd),
-              start: String(start),
-              end: String(end),
-              instituteId: String(ctx.instituteId ?? DEFAULT_INSTITUTE_ID),
-            }).toString();
-            const resp = await fetch(`/api/entries?${qs}`);
-            if (!resp.ok) throw new Error(`Falha ao buscar entradas (${resp.status})`);
-            const data = await resp.json();
-            post({ type: MSG.ENTRIES_DATA, payload: data });
-            break;
-          }
-          case MSG.DAILY_CARD: {
-            const p = (msg.payload || {}) as { date?: string; paes_units?: number; salgados_units?: number; repasse_amount?: number };
-            setDailyCard({
-              date: String(p.date || ctx.range.start),
-              paes_units: Number(p.paes_units || 0),
-              salgados_units: Number(p.salgados_units || 0),
-              repasse_amount: Number(p.repasse_amount || 0),
-            });
-            // Persist asynchronously (best-effort) to Supabase if envs exist
-            try {
-              const base = (window as any).VITE_SUPABASE_URL || (import.meta as any).env?.VITE_SUPABASE_URL;
-              if (base) {
-                fetch('/api/entries', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    user_id: ctx.userId ?? '00000000-0000-0000-0000-000000000001',
-                    institute_id: ctx.instituteId ?? DEFAULT_INSTITUTE_ID,
-                    entry_date: String(p.date || ctx.range.start),
-                    period: 'daily',
-                    amount: Number(p.repasse_amount || 0),
-                    description: `Card diário: pães ${Number(p.paes_units||0)}, salgados ${Number(p.salgados_units||0)}`,
-                  })
-                }).catch(()=>{});
-              }
-            } catch {}
-            break;
-          }
-          case MSG.CREATE_ENTRY: {
-            const p = (msg.payload || {}) as CreateEntryPayload;
-            const payload = {
-              user_id: ctx.userId ?? "00000000-0000-0000-0000-000000000001",
-              institute_id: ctx.instituteId ?? DEFAULT_INSTITUTE_ID,
-              entry_date: p.entry_date ?? ctx.range.start,
-              period: p.period ?? ctx.period,
-              amount: p.amount,
-              description: p.description ?? null,
-            };
-            const resp = await fetch(`/api/entries`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-            if (!resp.ok) throw new Error(`Falha ao criar (${resp.status})`);
-            const created = await resp.json();
-            post({ type: MSG.ENTRY_CREATED, payload: created });
-            break;
-          }
-          case MSG.UPDATE_ENTRY: {
-            const p = (msg.payload || {}) as UpdateEntryPayload;
-            const resp = await fetch(`/api/entries/${encodeURIComponent(p.id)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount: p.amount, description: p.description }) });
-            if (!resp.ok) throw new Error(`Falha ao atualizar (${resp.status})`);
-            post({ type: MSG.ENTRY_UPDATED, payload: { id: p.id } });
-            break;
-          }
-          case MSG.DELETE_ENTRY: {
-            const p = (msg.payload || {}) as DeleteEntryPayload;
-            const resp = await fetch(`/api/entries/${encodeURIComponent(p.id)}`, { method: 'DELETE' });
-            if (!resp.ok) throw new Error(`Falha ao excluir (${resp.status})`);
-            post({ type: MSG.ENTRY_DELETED, payload: { id: p.id } });
-            break;
-          }
-          default:
-            break;
-        }
-      } catch (err: any) {
-        const message = err?.message || 'Erro desconhecido';
-        onError?.(message);
-        post({ type: MSG.ERROR, payload: { message } });
-        toast({ title: "Integração: erro", description: message });
-      }
-    };
+			try {
+				switch (msg.type) {
+					case MSG.EXT_INIT: {
+						setConnected(true);
+						onConnected?.();
+						post({ type: MSG.HOST_READY, payload: ctx });
+						break;
+					}
+					case MSG.REQUEST_CONTEXT: {
+						post({ type: MSG.CONTEXT_DATA, payload: ctx });
+						break;
+					}
+					case MSG.REQUEST_ENTRIES: {
+						const p = (msg.payload || {}) as RequestEntriesPayload;
+						const prd = p.period ?? ctx.period;
+						const start = p.start ?? ctx.range.start;
+						const end = p.end ?? ctx.range.end;
+						const qs = new URLSearchParams({
+							period: String(prd),
+							start: String(start),
+							end: String(end),
+							instituteId: String(ctx.instituteId ?? DEFAULT_INSTITUTE_ID),
+						}).toString();
+						const resp = await fetch(`/api/entries?${qs}`);
+						if (!resp.ok) throw new Error(`Falha ao buscar entradas (${resp.status})`);
+						const data = await resp.json();
+						post({ type: MSG.ENTRIES_DATA, payload: data });
+						break;
+					}
+					case MSG.DAILY_CARD: {
+						const p = (msg.payload || {}) as { date?: string; paes_units?: number; salgados_units?: number; repasse_amount?: number };
+						setDailyCard({
+							date: String(p.date || ctx.range.start),
+							paes_units: Number(p.paes_units || 0),
+							salgados_units: Number(p.salgados_units || 0),
+							repasse_amount: Number(p.repasse_amount || 0),
+						});
+						// Persistir sempre via API interna (server-side)
+						try {
+							await fetch('/api/entries', {
+								method: 'POST',
+								headers: { 'Content-Type': 'application/json' },
+								body: JSON.stringify({
+									user_id: ctx.userId ?? '00000000-0000-0000-0000-000000000001',
+									institute_id: ctx.instituteId ?? DEFAULT_INSTITUTE_ID,
+									entry_date: String(p.date || ctx.range.start),
+									period: 'daily',
+									amount: Number(p.repasse_amount || 0),
+									description: `Card diário: pães ${Number(p.paes_units||0)}, salgados ${Number(p.salgados_units||0)}`,
+								})
+							});
+						} catch {}
+						break;
+					}
+					case MSG.CREATE_ENTRY: {
+						const p = (msg.payload || {}) as CreateEntryPayload;
+						const payload = {
+							user_id: ctx.userId ?? "00000000-0000-0000-0000-000000000001",
+							institute_id: ctx.instituteId ?? DEFAULT_INSTITUTE_ID,
+							entry_date: p.entry_date ?? ctx.range.start,
+							period: p.period ?? ctx.period,
+							amount: p.amount,
+							description: p.description ?? null,
+						};
+						const resp = await fetch(`/api/entries`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+						if (!resp.ok) throw new Error(`Falha ao criar (${resp.status})`);
+						const created = await resp.json();
+						post({ type: MSG.ENTRY_CREATED, payload: created });
+						break;
+					}
+					case MSG.UPDATE_ENTRY: {
+						const p = (msg.payload || {}) as UpdateEntryPayload;
+						const resp = await fetch(`/api/entries/${encodeURIComponent(p.id)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount: p.amount, description: p.description }) });
+						if (!resp.ok) throw new Error(`Falha ao atualizar (${resp.status})`);
+						post({ type: MSG.ENTRY_UPDATED, payload: { id: p.id } });
+						break;
+					}
+					case MSG.DELETE_ENTRY: {
+						const p = (msg.payload || {}) as DeleteEntryPayload;
+						const resp = await fetch(`/api/entries/${encodeURIComponent(p.id)}`, { method: 'DELETE' });
+						if (!resp.ok) throw new Error(`Falha ao excluir (${resp.status})`);
+						post({ type: MSG.ENTRY_DELETED, payload: { id: p.id } });
+						break;
+					}
+					default:
+						break;
+				}
+			} catch (err: any) {
+				const message = err?.message || 'Erro desconhecido';
+				onError?.(message);
+				post({ type: MSG.ERROR, payload: { message } });
+				toast({ title: "Integração: erro", description: message });
+			}
+		};
 
-    window.addEventListener("message", handler);
-    return () => window.removeEventListener("message", handler);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [targetOrigin, ctx]);
+		window.addEventListener("message", handler);
+		return () => window.removeEventListener("message", handler);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [targetOrigin, ctx]);
 
-  const post = (m: ExtMessage) => {
-    const contentWindow = iframeRef.current?.contentWindow;
-    if (!contentWindow) return;
-    contentWindow.postMessage(m, targetOrigin === "*" ? "*" : targetOrigin);
-  };
+	const post = (m: ExtMessage) => {
+		const contentWindow = iframeRef.current?.contentWindow;
+		if (!contentWindow) return;
+		contentWindow.postMessage(m, targetOrigin === "*" ? "*" : targetOrigin);
+	};
 
-  const fullUrl = useMemo(() => buildUrl(url, ctx), [url, ctx]);
+	const fullUrl = useMemo(() => buildUrl(url, ctx), [url, ctx]);
 
-  return (
-    <Card className="mt-4">
-      <CardHeader className="flex-row items-center justify-between">
-        <CardTitle>Integração externa</CardTitle>
-        <div className="flex items-center gap-2">
-          <Badge variant={connected ? "default" : "secondary"}>{connected ? "Conectado" : "Aguardando"}</Badge>
-          <Button size="sm" variant="secondary" onClick={() => post({ type: MSG.REQUEST_CONTEXT })}>Reenviar contexto</Button>
-          <Button size="sm" variant="destructive" onClick={onClose}>Fechar</Button>
-        </div>
-      </CardHeader>
-      <CardContent>
-        {dailyCard && (
-          <div className="mb-3 grid md:grid-cols-3 gap-2 text-sm">
-            <div className="rounded border p-2">
-              <div className="text-muted-foreground">Pães (unid)</div>
-              <div className="font-bold text-lg">{dailyCard.paes_units}</div>
-            </div>
-            <div className="rounded border p-2">
-              <div className="text-muted-foreground">Salgados (unid)</div>
-              <div className="font-bold text-lg">{dailyCard.salgados_units}</div>
-            </div>
-            <div className="rounded border p-2">
-              <div className="text-muted-foreground">Repasse (R$)</div>
-              <div className="font-bold text-lg">R$ {dailyCard.repasse_amount.toFixed(2)}</div>
-            </div>
-          </div>
-        )}
-        <div className="text-xs text-muted-foreground mb-2">Destino: {getOrigin(url)}</div>
-        <iframe
-          ref={iframeRef}
-          title="External Integration"
-          src={fullUrl}
-          className="w-full h-[600px] rounded-md border"
-          sandbox="allow-scripts allow-forms allow-same-origin allow-popups"
-        />
-      </CardContent>
-    </Card>
-  );
+	return (
+		<Card className="mt-4">
+			<CardHeader className="flex-row items-center justify-between">
+				<CardTitle>Integração externa</CardTitle>
+				<div className="flex items-center gap-2">
+					<Badge variant={connected ? "default" : "secondary"}>{connected ? "Conectado" : "Aguardando"}</Badge>
+					<Button size="sm" variant="secondary" onClick={() => post({ type: MSG.REQUEST_CONTEXT })}>Reenviar contexto</Button>
+					<Button size="sm" variant="destructive" onClick={onClose}>Fechar</Button>
+				</div>
+			</CardHeader>
+			<CardContent>
+				{dailyCard && (
+					<div className="mb-3 grid md:grid-cols-3 gap-2 text-sm">
+						<div className="rounded border p-2">
+							<div className="text-muted-foreground">Pães (unid)</div>
+							<div className="font-bold text-lg">{dailyCard.paes_units}</div>
+						</div>
+						<div className="rounded border p-2">
+							<div className="text-muted-foreground">Salgados (unid)</div>
+							<div className="font-bold text-lg">{dailyCard.salgados_units}</div>
+						</div>
+						<div className="rounded border p-2">
+							<div className="text-muted-foreground">Repasse (R$)</div>
+							<div className="font-bold text-lg">R$ {dailyCard.repasse_amount.toFixed(2)}</div>
+						</div>
+					</div>
+				)}
+				<div className="text-xs text-muted-foreground mb-2">Destino: {getOrigin(url)}</div>
+				<iframe
+					ref={iframeRef}
+					title="External Integration"
+					src={fullUrl}
+					className="w-full h-[600px] rounded-md border"
+					sandbox="allow-scripts allow-forms allow-same-origin allow-popups"
+				/>
+			</CardContent>
+		</Card>
+	);
 }
