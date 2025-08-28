@@ -24,7 +24,7 @@
 		{ "source": "/api/entries/:id", "destination": "/api/entries/[id].js" },
 		{ "source": "/api/integration/receive", "destination": "/api/integration/receive.ts" },
 		{ "source": "/api/integration/ingest-card", "destination": "/api/integration/ingest-card.js" },
-		{ "source": "/api/integration/pull-daily-card", "destination": "/api/integration/pull-daily-card.ts" },
+		{ "source": "/api/integration/pull-daily-card", "destination": "/api/integration/pull-daily-card.js" },
 		{ "source": "/api/integration/debug", "destination": "/api/integration/debug.js" },
 		{ "source": "/api/cron/daily-card", "destination": "/api/cron/daily-card.ts" },
 		{ "source": "/api/health", "destination": "/api/health.js" }
