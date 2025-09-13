@@ -138,6 +138,52 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
     notifyOk("Instituto adicionado!");
   };
 
+  const deleteInstituto = async (id: string, nome: string) => {
+    // Verificar se há escalas associadas ao instituto
+    const escalasAssociadas = escala.filter(e => e.instituto_id === id);
+    
+    if (escalasAssociadas.length > 0) {
+      const confirmar = window.confirm(
+        `O instituto "${nome}" possui ${escalasAssociadas.length} escala(s) atribuída(s).\n\n` +
+        `Deseja excluir o instituto e todas as suas escalas?\n\n` +
+        `Esta ação não pode ser desfeita.`
+      );
+      
+      if (!confirmar) return;
+      
+      // Primeiro, excluir todas as escalas associadas
+      const { error: errorEscalas } = await supabase
+        .from("escala")
+        .delete()
+        .eq("instituto_id", id);
+      
+      if (errorEscalas) {
+        notifyErr(`Erro ao excluir escalas: ${errorEscalas.message}`);
+        return;
+      }
+      
+      // Atualizar estado das escalas
+      setEscala(prev => prev.filter(e => e.instituto_id !== id));
+    } else {
+      const confirmar = window.confirm(
+        `Tem certeza que deseja excluir o instituto "${nome}"?\n\n` +
+        `Esta ação não pode ser desfeita.`
+      );
+      
+      if (!confirmar) return;
+    }
+    
+    // Excluir o instituto
+    const { error } = await supabase.from("institutos").delete().eq("id", id);
+    if (error) {
+      notifyErr(`Erro ao excluir instituto: ${error.message}`);
+      return;
+    }
+    
+    setInstitutos(prev => prev.filter(i => i.id !== id));
+    notifyOk(`Instituto "${nome}" excluído com sucesso!`);
+  };
+
   const addEscala = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
@@ -723,9 +769,32 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
                     <Input name="instituto" placeholder="Nome do instituto" />
                     <Button type="submit">Adicionar</Button>
                   </form>
-                  <ul className="text-sm text-muted-foreground columns-2">
-                    {institutos.map(i=> <li key={i.id}>• {i.nome}</li>)}
-                  </ul>
+                  <div className="space-y-2">
+                    {institutos.map(i => (
+                      <div key={i.id} className="flex items-center justify-between p-3 border rounded-lg bg-card">
+                        <div className="flex items-center gap-3">
+                          <div className="w-2 h-2 bg-primary rounded-full"></div>
+                          <span className="font-medium">{i.nome}</span>
+                          <Badge variant="secondary" className="text-xs">
+                            {escala.filter(e => e.instituto_id === i.id).length} escala(s)
+                          </Badge>
+                        </div>
+                        <Button 
+                          variant="destructive" 
+                          size="sm"
+                          onClick={() => deleteInstituto(i.id, i.nome)}
+                          className="ml-2"
+                        >
+                          Excluir
+                        </Button>
+                      </div>
+                    ))}
+                    {institutos.length === 0 && (
+                      <p className="text-sm text-muted-foreground text-center py-4">
+                        Nenhum instituto cadastrado. Adicione um instituto para começar.
+                      </p>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
 
@@ -765,10 +834,22 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
               {institutos.map((i)=> (
                 <Card key={i.id} className="animate-fade-in">
                   <CardHeader>
-                    <CardTitle>{i.nome} — Escala semanal</CardTitle>
-                    <p className="text-sm text-muted-foreground">
-                      Visualize e gerencie as escalas por turno e dia da semana
-                    </p>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle>{i.nome} — Escala semanal</CardTitle>
+                        <p className="text-sm text-muted-foreground">
+                          Visualize e gerencie as escalas por turno e dia da semana
+                        </p>
+                      </div>
+                      <Button 
+                        variant="destructive" 
+                        size="sm"
+                        onClick={() => deleteInstituto(i.id, i.nome)}
+                        className="ml-4"
+                      >
+                        Excluir Instituto
+                      </Button>
+                    </div>
                   </CardHeader>
                   <CardContent>
                     <Table aria-labelledby={`escala-${i.id}`}>
