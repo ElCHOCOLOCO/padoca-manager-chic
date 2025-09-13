@@ -29,7 +29,18 @@ const IntegracaoVendas = lazy(() => import("@/components/integracao/IntegracaoVe
 type Turno = "manha" | "tarde" | "noite";
 type Dia = "seg" | "ter" | "qua" | "qui" | "sex";
 
-type Camarada = { id: string; nome: string; curso: string; turnos: Turno[] };
+type HorarioDisponivel = {
+  dia: Dia;
+  turno: Turno;
+};
+
+type Camarada = { 
+  id: string; 
+  nome: string; 
+  curso: string; 
+  turnos: Turno[];
+  horariosDisponiveis?: HorarioDisponivel[];
+};
 
 const Index = () => {
   useEffect(() => {
@@ -63,7 +74,7 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
   const loadAll = useCallback(async () => {
     try {
       const tables = [
-        supabase.from("camaradas").select("id,nome,curso,turnos"),
+        supabase.from("camaradas").select("id,nome,curso,turnos,horarios_disponiveis"),
         supabase.from("institutos").select("id,nome"),
         supabase.from("escala").select("id,camarada_id,instituto_id,turno,dia"),
         supabase.from("insumos").select("id,nome,custo_unitario"),
@@ -118,8 +129,29 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
     const nome = String(fd.get("nome")||"").trim();
     const curso = String(fd.get("curso")||"").trim();
     const turnos = ["manha","tarde","noite"].filter(t=>fd.get(t));
+    
+    // Coletar horários disponíveis específicos
+    const horariosDisponiveis: HorarioDisponivel[] = [];
+    const dias: Dia[] = ["seg", "ter", "qua", "qui", "sex"];
+    
+    dias.forEach(dia => {
+      turnos.forEach(turno => {
+        const checkboxName = `${dia}-${turno}`;
+        if (fd.get(checkboxName)) {
+          horariosDisponiveis.push({ dia, turno });
+        }
+      });
+    });
+    
     if(!nome) return notifyErr("Informe o nome.");
-    const { data, error } = await supabase.from("camaradas").insert({ nome, curso, turnos }).select();
+    if(horariosDisponiveis.length === 0) return notifyErr("Selecione pelo menos um horário disponível.");
+    
+    const { data, error } = await supabase.from("camaradas").insert({ 
+      nome, 
+      curso, 
+      turnos,
+      horarios_disponiveis: horariosDisponiveis
+    }).select();
     if(error) return notifyErr(error.message);
     setCamaradas((p)=>[...(data as any), ...p]);
     e.currentTarget.reset();
@@ -191,8 +223,19 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
     const instituto_id = String(fd.get("inst")||"");
     const turno = String(fd.get("turno")||"") as Turno;
     const dia = String(fd.get("dia")||"") as Dia;
-    if(!camarada_id||!instituto_id||!turno) return notifyErr("Preencha todos os campos.");
-    const { data, error } = await supabase.from("escala").insert({ camarada_id, instituto_id, turno, dia: dia || null }).select();
+    
+    if(!camarada_id||!instituto_id||!turno||!dia) return notifyErr("Preencha todos os campos.");
+    
+    // Verificar se o camarada está disponível para este horário
+    const camaradasDisponiveis = getCamaradasDisponiveis(dia, turno);
+    const camaradaSelecionado = camaradasDisponiveis.find(c => c.id === camarada_id);
+    
+    if (!camaradaSelecionado) {
+      notifyErr("Este camarada não está disponível para este horário.");
+      return;
+    }
+    
+    const { data, error } = await supabase.from("escala").insert({ camarada_id, instituto_id, turno, dia }).select();
     if(error) return notifyErr(error.message);
     setEscala((p)=>[...(data as any), ...p]);
     e.currentTarget.reset();
@@ -337,8 +380,31 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
   const labelDia: Record<Dia,string> = { seg: "Seg", ter: "Ter", qua: "Qua", qui: "Qui", sex: "Sex" };
   const labelTurno: Record<Turno,string> = { manha: "Manhã", tarde: "Tarde", noite: "Noite" };
 
+  // Função para filtrar camaradas disponíveis para um horário específico
+  const getCamaradasDisponiveis = (dia: Dia, turno: Turno) => {
+    return camaradas.filter(camarada => {
+      // Se não tem horários específicos definidos, usa os turnos gerais
+      if (!camarada.horariosDisponiveis || camarada.horariosDisponiveis.length === 0) {
+        return camarada.turnos?.includes(turno);
+      }
+      
+      // Verifica se o camarada tem disponibilidade para o horário específico
+      return camarada.horariosDisponiveis.some(h => h.dia === dia && h.turno === turno);
+    });
+  };
+
   const assignEscala = async (instituto_id: string, dia: Dia, turno: Turno, camarada_id: string) => {
     if (!camarada_id) return;
+    
+    // Verificar se o camarada está disponível para este horário
+    const camaradasDisponiveis = getCamaradasDisponiveis(dia, turno);
+    const camaradaSelecionado = camaradasDisponiveis.find(c => c.id === camarada_id);
+    
+    if (!camaradaSelecionado) {
+      notifyErr("Este camarada não está disponível para este horário.");
+      return;
+    }
+    
     const { data, error } = await supabase.from("escala").insert({ instituto_id, dia, turno, camarada_id }).select();
     if (error) return notifyErr(error.message);
     setEscala((p)=>[...(data as any), ...p]);
@@ -404,54 +470,114 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
             <Card>
               <CardHeader>
                 <CardTitle>Cadastro de camaradas</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Cadastre camaradas e defina seus horários específicos de disponibilidade
+                </p>
               </CardHeader>
               <CardContent>
-                <form onSubmit={addCamarada} className="grid md:grid-cols-4 gap-4">
+                <form onSubmit={addCamarada} className="space-y-6">
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="nome">Nome</Label>
+                      <Input id="nome" name="nome" placeholder="Ex: João" />
+                    </div>
+                    <div>
+                      <Label htmlFor="curso">Curso</Label>
+                      <Input id="curso" name="curso" placeholder="Ex: Engenharia" />
+                    </div>
+                  </div>
+                  
                   <div>
-                    <Label htmlFor="nome">Nome</Label>
-                    <Input id="nome" name="nome" placeholder="Ex: João" />
+                    <Label className="text-base font-medium">Turnos Gerais</Label>
+                    <p className="text-sm text-muted-foreground mb-3">Selecione os turnos que o camarada pode trabalhar</p>
+                    <div className="flex items-center gap-6">
+                      <div className="flex items-center gap-2">
+                        <input type="checkbox" name="manha" id="manha" />
+                        <Label htmlFor="manha">Manhã</Label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input type="checkbox" name="tarde" id="tarde" />
+                        <Label htmlFor="tarde">Tarde</Label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input type="checkbox" name="noite" id="noite" />
+                        <Label htmlFor="noite">Noite</Label>
+                      </div>
+                    </div>
                   </div>
+
                   <div>
-                    <Label htmlFor="curso">Curso</Label>
-                    <Input id="curso" name="curso" placeholder="Ex: Engenharia" />
+                    <Label className="text-base font-medium">Horários Específicos</Label>
+                    <p className="text-sm text-muted-foreground mb-3">Selecione os horários exatos de disponibilidade</p>
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                      {dias.map(dia => (
+                        <div key={dia} className="space-y-2">
+                          <Label className="font-medium text-center block">{labelDia[dia]}</Label>
+                          {(["manha", "tarde", "noite"] as Turno[]).map(turno => (
+                            <div key={turno} className="flex items-center gap-2">
+                              <input 
+                                type="checkbox" 
+                                name={`${dia}-${turno}`} 
+                                id={`${dia}-${turno}`}
+                                className="rounded"
+                              />
+                              <Label htmlFor={`${dia}-${turno}`} className="text-sm">
+                                {labelTurno[turno]}
+                              </Label>
+                            </div>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2"><input type="checkbox" name="manha" id="manha" /><Label htmlFor="manha">Manhã</Label></div>
-                    <div className="flex items-center gap-2"><input type="checkbox" name="tarde" id="tarde" /><Label htmlFor="tarde">Tarde</Label></div>
-                    <div className="flex items-center gap-2"><input type="checkbox" name="noite" id="noite" /><Label htmlFor="noite">Noite</Label></div>
+                  
+                  <div className="flex justify-end">
+                    <Button type="submit">Salvar Camarada</Button>
                   </div>
-                  <div className="flex items-end"><Button type="submit">Salvar</Button></div>
                 </form>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle>Lista</CardTitle>
+                <CardTitle>Lista de Camaradas</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Visualize todos os camaradas cadastrados e seus horários de disponibilidade
+                </p>
               </CardHeader>
               <CardContent>
-                                  <Table aria-labelledby="titulo-camaradas">
-                    <TableCaption id="titulo-camaradas">Lista de camaradas cadastrados</TableCaption>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Nome</TableHead>
-                        <TableHead>Curso</TableHead>
-                        <TableHead>Turnos</TableHead>
+                <Table aria-labelledby="titulo-camaradas">
+                  <TableCaption id="titulo-camaradas">Lista de camaradas cadastrados</TableCaption>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nome</TableHead>
+                      <TableHead>Curso</TableHead>
+                      <TableHead>Turnos Gerais</TableHead>
+                      <TableHead>Horários Específicos</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {camaradas.map(c=> (
+                      <TableRow key={c.id}>
+                        <TableCell className="font-medium">{c.nome}</TableCell>
+                        <TableCell>{c.curso}</TableCell>
+                        <TableCell className="space-x-1">
+                          {c.turnos?.map(t=> <Badge key={t} variant="secondary" className="text-xs">{labelTurno[t]}</Badge>)}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1">
+                            {c.horariosDisponiveis?.map((h, idx) => (
+                              <Badge key={idx} variant="outline" className="text-xs">
+                                {labelDia[h.dia]} {labelTurno[h.turno]}
+                              </Badge>
+                            ))}
+                          </div>
+                        </TableCell>
                       </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {camaradas.map(c=> (
-                        <TableRow key={c.id}>
-                          <TableCell>{c.nome}</TableCell>
-                          <TableCell>{c.curso}</TableCell>
-                          <TableCell className="space-x-2">
-                            {c.turnos?.map(t=> <Badge key={t} variant="secondary">{t}</Badge>)}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-</CardContent>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
             </Card>
           </TabsContent>
 
@@ -799,13 +925,14 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
               </Card>
 
               <Card>
-                <CardHeader><CardTitle>Designar camarada</CardTitle></CardHeader>
+                <CardHeader>
+                  <CardTitle>Designar camarada</CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Atribua camaradas considerando sua disponibilidade específica
+                  </p>
+                </CardHeader>
                 <CardContent>
                   <form onSubmit={addEscala} className="grid md:grid-cols-5 gap-2">
-                    <select name="camarada" className="border rounded-md px-3 py-2 bg-background">
-                      <option value="">Camarada</option>
-                      {camaradas.map(c=> <option key={c.id} value={c.id}>{c.nome}</option>)}
-                    </select>
                     <select name="inst" className="border rounded-md px-3 py-2 bg-background">
                       <option value="">Instituto</option>
                       {institutos.map(i=> <option key={i.id} value={i.id}>{i.nome}</option>)}
@@ -824,8 +951,15 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
                       <option value="tarde">Tarde</option>
                       <option value="noite">Noite</option>
                     </select>
+                    <select name="camarada" className="border rounded-md px-3 py-2 bg-background">
+                      <option value="">Camarada</option>
+                      {camaradas.map(c=> <option key={c.id} value={c.id}>{c.nome} ({c.curso})</option>)}
+                    </select>
                     <Button type="submit">Atribuir</Button>
                   </form>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    💡 Dica: Os camaradas são filtrados automaticamente na escala baseado em sua disponibilidade específica
+                  </p>
                 </CardContent>
               </Card>
             </div>
@@ -916,8 +1050,17 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
                                     }}
                                   >
                                     <option value="">Adicionar…</option>
-                                    {camaradas.map(c=> (<option key={c.id} value={c.id}>{c.nome}</option>))}
+                                    {getCamaradasDisponiveis(d, t).map(c=> (
+                                      <option key={c.id} value={c.id}>
+                                        {c.nome} ({c.curso})
+                                      </option>
+                                    ))}
                                   </select>
+                                  {getCamaradasDisponiveis(d, t).length === 0 && (
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                      Nenhum camarada disponível
+                                    </p>
+                                  )}
                                 </div>
                               </TableCell>
                             ))}
