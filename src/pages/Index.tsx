@@ -74,7 +74,7 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
   const loadAll = useCallback(async () => {
     try {
       const tables = [
-        supabase.from("camaradas").select("id,nome,curso,turnos"),
+        supabase.from("camaradas").select("id,nome,curso,turnos,horarios_disponiveis"),
         supabase.from("institutos").select("id,nome"),
         supabase.from("escala").select("id,camarada_id,instituto_id,turno,dia"),
         supabase.from("insumos").select("id,nome,custo_unitario"),
@@ -145,11 +145,13 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
     
     if(!nome) return notifyErr("Informe o nome.");
     if(turnos.length === 0) return notifyErr("Selecione pelo menos um turno.");
+    if(horariosDisponiveis.length === 0) return notifyErr("Selecione pelo menos um horário específico.");
     
     const { data, error } = await supabase.from("camaradas").insert({ 
       nome, 
       curso, 
-      turnos
+      turnos,
+      horarios_disponiveis: horariosDisponiveis
     }).select();
     if(error) return notifyErr(error.message);
     setCamaradas((p)=>[...(data as any), ...p]);
@@ -382,8 +384,13 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
   // Função para filtrar camaradas disponíveis para um horário específico
   const getCamaradasDisponiveis = (dia: Dia, turno: Turno) => {
     return camaradas.filter(camarada => {
-      // Por enquanto, usa apenas os turnos gerais até a coluna horarios_disponiveis ser criada
-      return camarada.turnos?.includes(turno);
+      // Se não tem horários específicos definidos, usa os turnos gerais
+      if (!camarada.horariosDisponiveis || camarada.horariosDisponiveis.length === 0) {
+        return camarada.turnos?.includes(turno);
+      }
+      
+      // Verifica se o camarada tem disponibilidade para o horário específico
+      return camarada.horariosDisponiveis.some(h => h.dia === dia && h.turno === turno);
     });
   };
 
@@ -503,14 +510,31 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
                   <div>
                     <Label className="text-base font-medium">Horários Específicos</Label>
                     <p className="text-sm text-muted-foreground mb-3">
-                      ⚠️ Funcionalidade em desenvolvimento. Por enquanto, use apenas os turnos gerais acima.
+                      Selecione os horários exatos de disponibilidade (dia + turno)
                     </p>
-                    <div className="p-4 bg-muted rounded-lg">
-                      <p className="text-sm text-muted-foreground">
-                        <strong>Próxima versão:</strong> Você poderá selecionar horários específicos por dia da semana.
-                        Por exemplo: "Segunda de manhã", "Terça à tarde", etc.
-                      </p>
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                      {dias.map(dia => (
+                        <div key={dia} className="space-y-2">
+                          <Label className="font-medium text-center block">{labelDia[dia]}</Label>
+                          {(["manha", "tarde", "noite"] as Turno[]).map(turno => (
+                            <div key={turno} className="flex items-center gap-2">
+                              <input 
+                                type="checkbox" 
+                                name={`${dia}-${turno}`} 
+                                id={`${dia}-${turno}`}
+                                className="rounded"
+                              />
+                              <Label htmlFor={`${dia}-${turno}`} className="text-sm">
+                                {labelTurno[turno]}
+                              </Label>
+                            </div>
+                          ))}
+                        </div>
+                      ))}
                     </div>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      💡 Dica: Selecione apenas os horários que o camarada realmente pode trabalhar
+                    </p>
                   </div>
                   
                   <div className="flex justify-end">
@@ -548,9 +572,16 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-wrap gap-1">
-                            <Badge variant="outline" className="text-xs">
-                              Em desenvolvimento
-                            </Badge>
+                            {c.horariosDisponiveis?.map((h, idx) => (
+                              <Badge key={idx} variant="outline" className="text-xs">
+                                {labelDia[h.dia]} {labelTurno[h.turno]}
+                              </Badge>
+                            ))}
+                            {(!c.horariosDisponiveis || c.horariosDisponiveis.length === 0) && (
+                              <Badge variant="secondary" className="text-xs">
+                                Apenas turnos gerais
+                              </Badge>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
