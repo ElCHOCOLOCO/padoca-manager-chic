@@ -66,6 +66,7 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
 // Estados para edição
   const [editingCA, setEditingCA] = useState<string | null>(null);
   const [editingEscala, setEditingEscala] = useState<string | null>(null);
+  const [editingCamarada, setEditingCamarada] = useState<Camarada | null>(null);
   const [activeView, setActiveView] = useState<'camaradas' | 'institutos' | 'turnos' | 'estatisticas'>('camaradas');
 
   const supabase: any = supabaseClient as any;
@@ -157,6 +158,75 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
     setCamaradas((p)=>[...(data as any), ...p]);
     e.currentTarget.reset();
     notifyOk("Camarada cadastrado!");
+  };
+
+  const updateCamarada = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!editingCamarada) return;
+    
+    const fd = new FormData(e.currentTarget);
+    const nome = String(fd.get("edit-nome")||"").trim();
+    const curso = String(fd.get("edit-curso")||"").trim();
+    const turnos = ["manha","tarde","noite"].filter(t=>fd.get(`edit-${t}`));
+    
+    // Coletar horários disponíveis específicos
+    const horariosDisponiveis: HorarioDisponivel[] = [];
+    const dias: Dia[] = ["seg", "ter", "qua", "qui", "sex"];
+    
+    dias.forEach(dia => {
+      turnos.forEach(turno => {
+        const checkboxName = `edit-${dia}-${turno}`;
+        if (fd.get(checkboxName)) {
+          horariosDisponiveis.push({ dia, turno });
+        }
+      });
+    });
+    
+    if(!nome) return notifyErr("Informe o nome.");
+    if(turnos.length === 0) return notifyErr("Selecione pelo menos um turno.");
+    if(horariosDisponiveis.length === 0) return notifyErr("Selecione pelo menos um horário específico.");
+    
+    const { data, error } = await supabase.from("camaradas").update({ 
+      nome, 
+      curso, 
+      turnos,
+      horarios_disponiveis: horariosDisponiveis
+    }).eq("id", editingCamarada.id).select();
+    
+    if(error) return notifyErr(error.message);
+    setCamaradas((p)=> p.map(c => c.id === editingCamarada.id ? (data[0] as any) : c));
+    setEditingCamarada(null);
+    notifyOk("Camarada atualizado!");
+  };
+
+  const deleteCamarada = async (id: string, nome: string) => {
+    const confirmar = window.confirm(
+      `Tem certeza que deseja excluir o camarada "${nome}"?\n\n` +
+      `Esta ação não pode ser desfeita e removerá todas as escalas associadas.`
+    );
+    if (!confirmar) return;
+
+    // Verificar se há escalas associadas
+    const escalasAssociadas = escala.filter(e => e.camarada_id === id);
+    if (escalasAssociadas.length > 0) {
+      // Remover escalas associadas primeiro
+      const { error: errorEscalas } = await supabase.from("escala").delete().eq("camarada_id", id);
+      if (errorEscalas) {
+        notifyErr(`Erro ao excluir escalas: ${errorEscalas.message}`);
+        return;
+      }
+      setEscala(prev => prev.filter(e => e.camarada_id !== id));
+    }
+
+    // Remover camarada
+    const { error } = await supabase.from("camaradas").delete().eq("id", id);
+    if (error) {
+      notifyErr(`Erro ao excluir camarada: ${error.message}`);
+      return;
+    }
+    
+    setCamaradas(prev => prev.filter(c => c.id !== id));
+    notifyOk(`Camarada "${nome}" excluído com sucesso!`);
   };
 
   const addInstituto = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -560,6 +630,7 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
                       <TableHead>Curso</TableHead>
                       <TableHead>Turnos Gerais</TableHead>
                       <TableHead>Horários Específicos</TableHead>
+                      <TableHead>Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -584,12 +655,147 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
                             )}
                           </div>
                         </TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setEditingCamarada(c)}
+                            >
+                              Editar
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => deleteCamarada(c.id, c.nome)}
+                            >
+                              Excluir
+                            </Button>
+                          </div>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
               </CardContent>
             </Card>
+
+            {/* Modal de Edição de Camarada */}
+            {editingCamarada && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div className="bg-background p-6 rounded-lg max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+                  <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-xl font-semibold">Editar Camarada</h2>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setEditingCamarada(null)}
+                    >
+                      ✕
+                    </Button>
+                  </div>
+                  
+                  <form onSubmit={updateCamarada} className="space-y-6">
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="edit-nome">Nome</Label>
+                        <Input 
+                          id="edit-nome" 
+                          name="edit-nome" 
+                          defaultValue={editingCamarada.nome}
+                          placeholder="Ex: João" 
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="edit-curso">Curso</Label>
+                        <Input 
+                          id="edit-curso" 
+                          name="edit-curso" 
+                          defaultValue={editingCamarada.curso}
+                          placeholder="Ex: Engenharia" 
+                        />
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <Label className="text-base font-medium">Turnos Gerais</Label>
+                      <p className="text-sm text-muted-foreground mb-3">Selecione os turnos que o camarada pode trabalhar</p>
+                      <div className="flex items-center gap-6">
+                        <div className="flex items-center gap-2">
+                          <input 
+                            type="checkbox" 
+                            name="edit-manha" 
+                            id="edit-manha" 
+                            defaultChecked={editingCamarada.turnos?.includes("manha")}
+                          />
+                          <Label htmlFor="edit-manha">Manhã</Label>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input 
+                            type="checkbox" 
+                            name="edit-tarde" 
+                            id="edit-tarde" 
+                            defaultChecked={editingCamarada.turnos?.includes("tarde")}
+                          />
+                          <Label htmlFor="edit-tarde">Tarde</Label>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input 
+                            type="checkbox" 
+                            name="edit-noite" 
+                            id="edit-noite" 
+                            defaultChecked={editingCamarada.turnos?.includes("noite")}
+                          />
+                          <Label htmlFor="edit-noite">Noite</Label>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label className="text-base font-medium">Horários Específicos</Label>
+                      <p className="text-sm text-muted-foreground mb-3">
+                        Selecione os horários exatos de disponibilidade (dia + turno)
+                      </p>
+                      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                        {dias.map(dia => (
+                          <div key={dia} className="space-y-2">
+                            <Label className="font-medium text-center block">{labelDia[dia]}</Label>
+                            {(["manha", "tarde", "noite"] as Turno[]).map(turno => (
+                              <div key={turno} className="flex items-center gap-2">
+                                <input 
+                                  type="checkbox" 
+                                  name={`edit-${dia}-${turno}`} 
+                                  id={`edit-${dia}-${turno}`}
+                                  className="rounded"
+                                  defaultChecked={editingCamarada.horariosDisponiveis?.some(h => h.dia === dia && h.turno === turno)}
+                                />
+                                <Label htmlFor={`edit-${dia}-${turno}`} className="text-sm">
+                                  {labelTurno[turno]}
+                                </Label>
+                              </div>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        💡 Dica: Selecione apenas os horários que o camarada realmente pode trabalhar
+                      </p>
+                    </div>
+                    
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setEditingCamarada(null)}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button type="submit">Salvar Alterações</Button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="financeiro" className="mt-6 space-y-6">
