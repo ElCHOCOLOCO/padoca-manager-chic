@@ -156,7 +156,7 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
     }).select();
     if(error) return notifyErr(error.message);
     setCamaradas((p)=>[...(data as any), ...p]);
-    e.currentTarget.reset();
+    e.currentTarget?.reset();
     notifyOk("Camarada cadastrado!");
   };
 
@@ -237,7 +237,7 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
     const { data, error } = await supabase.from("institutos").insert({ nome }).select();
     if(error) return notifyErr(error.message);
     setInstitutos((p)=>[...(data as any), ...p]);
-    e.currentTarget.reset();
+    e.currentTarget?.reset();
     notifyOk("Instituto adicionado!");
   };
 
@@ -309,7 +309,7 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
     const { data, error } = await supabase.from("escala").insert({ camarada_id, instituto_id, turno, dia }).select();
     if(error) return notifyErr(error.message);
     setEscala((p)=>[...(data as any), ...p]);
-    e.currentTarget.reset();
+    e.currentTarget?.reset();
     notifyOk("Escala atribuída!");
   };
 
@@ -322,7 +322,7 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
     const { data, error } = await supabase.from("insumos").insert({ nome, custo_unitario }).select();
     if(error) return notifyErr(error.message);
     setInsumos((p)=>[...(data as any), ...p]);
-    e.currentTarget.reset();
+    e.currentTarget?.reset();
     notifyOk("Insumo adicionado!");
   };
 
@@ -335,7 +335,7 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
     const { data, error } = await supabase.from("custos_fixos").insert({ nome, valor_mensal }).select();
     if(error) return notifyErr(error.message);
     setCustosFixos((p)=>[...(data as any), ...p]);
-    e.currentTarget.reset();
+    e.currentTarget?.reset();
     notifyOk("Custo fixo adicionado!");
   };
 
@@ -377,7 +377,7 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
     const { data: d, error } = await supabase.from("vendas_diarias").insert({ data, unidades, preco_unitario }).select();
     if(error) return notifyErr(error.message);
     setVendas((p)=>[...(d as any), ...p]);
-    e.currentTarget.reset();
+    e.currentTarget?.reset();
     notifyOk("Venda registrada!");
   };
 
@@ -396,7 +396,7 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
     const { data, error } = await supabase.from("cas").insert(payload).select();
     if(error) return notifyErr(error.message);
     setCas((p)=>[...(data as any), ...p]);
-    e.currentTarget.reset();
+    e.currentTarget?.reset();
     notifyOk("CA cadastrado!");
   };
 
@@ -442,7 +442,7 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
     if(error) return notifyErr(error.message);
     setAgenda((p)=>[...(data as any), ...p]);
     setDataAgenda(undefined);
-    e.currentTarget.reset();
+    e.currentTarget?.reset();
     notifyOk("Compromisso adicionado!");
   };
 
