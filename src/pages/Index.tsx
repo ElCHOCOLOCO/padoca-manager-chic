@@ -1132,9 +1132,11 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
                       <div>
                         <p className="text-sm font-medium text-gray-600">Total de Turnos</p>
                         <p className="text-2xl font-bold text-blue-600">
-                          {turnosDisponiveis.length}
+                          {turnosDisponiveis.length > 0 ? turnosDisponiveis.length : 'N/A'}
                         </p>
-                        <p className="text-xs text-gray-500">Específicos + Gerais</p>
+                        <p className="text-xs text-gray-500">
+                          {turnosDisponiveis.length > 0 ? 'Específicos + Gerais' : 'Execute SQL para ativar'}
+                        </p>
                       </div>
                       <div className="text-3xl">🎯</div>
                     </div>
@@ -1146,7 +1148,7 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
                       <div>
                         <p className="text-sm font-medium text-gray-600">Manhã</p>
                         <p className="text-2xl font-bold text-orange-600">
-                          {turnosDisponiveis.filter(t => t.turno === 'manha').length}
+                          {turnosDisponiveis.length > 0 ? turnosDisponiveis.filter(t => t.turno === 'manha').length : 'N/A'}
                         </p>
                         <p className="text-xs text-gray-500">Disponibilidades</p>
                       </div>
@@ -1160,7 +1162,7 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
                       <div>
                         <p className="text-sm font-medium text-gray-600">Tarde</p>
                         <p className="text-2xl font-bold text-yellow-600">
-                          {turnosDisponiveis.filter(t => t.turno === 'tarde').length}
+                          {turnosDisponiveis.length > 0 ? turnosDisponiveis.filter(t => t.turno === 'tarde').length : 'N/A'}
                         </p>
                         <p className="text-xs text-gray-500">Disponibilidades</p>
                       </div>
@@ -1174,7 +1176,7 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
                       <div>
                         <p className="text-sm font-medium text-gray-600">Noite</p>
                         <p className="text-2xl font-bold text-purple-600">
-                          {turnosDisponiveis.filter(t => t.turno === 'noite').length}
+                          {turnosDisponiveis.length > 0 ? turnosDisponiveis.filter(t => t.turno === 'noite').length : 'N/A'}
                         </p>
                         <p className="text-xs text-gray-500">Disponibilidades</p>
                       </div>
@@ -1191,12 +1193,31 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
                       <div key={dia} className="text-center">
                         <p className="font-medium text-gray-600">{labelDia[dia]}</p>
                         <p className="text-lg font-bold text-indigo-600">
-                          {turnosDisponiveis.filter(t => t.dia === dia).length}
+                          {turnosDisponiveis.length > 0 ? turnosDisponiveis.filter(t => t.dia === dia).length : 'N/A'}
                         </p>
                       </div>
                     ))}
                   </div>
                 </div>
+
+                {/* Aviso sobre ativação das estatísticas */}
+                {turnosDisponiveis.length === 0 && (
+                  <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <div className="flex items-start gap-3">
+                      <div className="text-2xl">⚠️</div>
+                      <div>
+                        <h4 className="font-medium text-yellow-800 mb-2">Estatísticas de Turnos Não Ativadas</h4>
+                        <p className="text-sm text-yellow-700 mb-3">
+                          Para ver as estatísticas precisas de turnos, execute o script SQL no Supabase:
+                        </p>
+                        <div className="bg-yellow-100 p-3 rounded border text-xs font-mono text-yellow-800">
+                          <p className="font-medium mb-1">Arquivo: create_turnos_table.sql</p>
+                          <p>Este script criará a tabela turnos_disponiveis e populará com os dados existentes.</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -1436,19 +1457,28 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
 
                 <section>
                   <h3 className="font-medium mb-2">Carga de Trabalho por Camarada</h3>
-                  <div className="space-y-2">
-                    {camaradas.slice(0, 5).map((c) => {
+                  <div className="space-y-2 max-h-96 overflow-y-auto">
+                    {camaradas.map((c) => {
                       const totalEscalas = escala.filter(e => e.camarada_id === c.id).length;
                       const institutosAtribuidos = [...new Set(escala.filter(e => e.camarada_id === c.id).map(e => e.instituto_id))].length;
+                      const turnosDisponiveisCamarada = turnosDisponiveis.filter(t => t.camarada_id === c.id).length;
                       return (
-                        <div key={c.id} className="flex items-center justify-between p-2 border rounded-md">
-                          <div>
-                            <div className="font-medium">{c.nome}</div>
-                            <div className="text-xs text-muted-foreground">{c.curso}</div>
+                        <div key={c.id} className="flex items-center justify-between p-3 border rounded-md bg-white shadow-sm">
+                          <div className="flex-1">
+                            <div className="font-medium text-gray-900">{c.nome}</div>
+                            <div className="text-sm text-gray-600">{c.curso}</div>
+                            {c.horariosDisponiveis && c.horariosDisponiveis.length > 0 && (
+                              <div className="text-xs text-blue-600 mt-1">
+                                {c.horariosDisponiveis.length} horários específicos
+                              </div>
+                            )}
                           </div>
-                          <div className="text-right">
-                            <div className="font-medium">{totalEscalas} escalas</div>
-                            <div className="text-xs text-muted-foreground">{institutosAtribuidos} instituto(s)</div>
+                          <div className="text-right space-y-1">
+                            <div className="font-medium text-lg text-blue-600">{totalEscalas} escalas</div>
+                            <div className="text-sm text-gray-600">{institutosAtribuidos} instituto(s)</div>
+                            <div className="text-xs text-green-600">
+                              {turnosDisponiveisCamarada > 0 ? `${turnosDisponiveisCamarada} turnos disponíveis` : 'Turnos não contabilizados'}
+                            </div>
                           </div>
                         </div>
                       );
@@ -1457,6 +1487,11 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
                       <p className="text-sm text-muted-foreground">Nenhum camarada cadastrado.</p>
                     )}
                   </div>
+                  {camaradas.length > 0 && (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Mostrando todos os {camaradas.length} camaradas cadastrados
+                    </p>
+                  )}
                 </section>
 
                 <section>
