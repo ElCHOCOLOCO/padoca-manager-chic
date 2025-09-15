@@ -1124,10 +1124,11 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
                         <p className="text-2xl font-bold text-blue-600">
                           {camaradas.reduce((total, c) => {
                             if (c.horariosDisponiveis && c.horariosDisponiveis.length > 0) {
+                              // Conta cada horário específico como 1 ponto de disponibilidade
                               return total + c.horariosDisponiveis.length;
                             }
-                            // Se não tem horários específicos, conta cada turno geral como 5 turnos
-                            // Cada turno geral = 5 combinações (seg, ter, qua, qui, sex)
+                            // Se não tem horários específicos, conta cada turno geral como 5 pontos
+                            // Cada turno geral = 5 dias da semana (seg, ter, qua, qui, sex)
                             return total + ((c.turnos?.length || 0) * 5);
                           }, 0)}
                         </p>
@@ -1145,9 +1146,10 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
                         <p className="text-2xl font-bold text-orange-600">
                           {camaradas.reduce((total, c) => {
                             if (c.horariosDisponiveis && c.horariosDisponiveis.length > 0) {
+                              // Conta apenas os horários específicos de manhã
                               return total + c.horariosDisponiveis.filter(h => h.turno === 'manha').length;
                             }
-                            // Se não tem horários específicos, conta turno de manhã como 5 turnos
+                            // Se não tem horários específicos, conta turno de manhã como 5 pontos
                             return total + (c.turnos?.includes('manha') ? 5 : 0);
                           }, 0)}
                         </p>
@@ -1165,9 +1167,10 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
                         <p className="text-2xl font-bold text-yellow-600">
                           {camaradas.reduce((total, c) => {
                             if (c.horariosDisponiveis && c.horariosDisponiveis.length > 0) {
+                              // Conta apenas os horários específicos de tarde
                               return total + c.horariosDisponiveis.filter(h => h.turno === 'tarde').length;
                             }
-                            // Se não tem horários específicos, conta turno de tarde como 5 turnos
+                            // Se não tem horários específicos, conta turno de tarde como 5 pontos
                             return total + (c.turnos?.includes('tarde') ? 5 : 0);
                           }, 0)}
                         </p>
@@ -1185,9 +1188,10 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
                         <p className="text-2xl font-bold text-purple-600">
                           {camaradas.reduce((total, c) => {
                             if (c.horariosDisponiveis && c.horariosDisponiveis.length > 0) {
+                              // Conta apenas os horários específicos de noite
                               return total + c.horariosDisponiveis.filter(h => h.turno === 'noite').length;
                             }
-                            // Se não tem horários específicos, conta turno de noite como 5 turnos
+                            // Se não tem horários específicos, conta turno de noite como 5 pontos
                             return total + (c.turnos?.includes('noite') ? 5 : 0);
                           }, 0)}
                         </p>
@@ -1208,9 +1212,10 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
                         <p className="text-lg font-bold text-indigo-600">
                           {camaradas.reduce((total, c) => {
                             if (c.horariosDisponiveis && c.horariosDisponiveis.length > 0) {
+                              // Conta apenas os horários específicos para este dia
                               return total + c.horariosDisponiveis.filter(h => h.dia === dia).length;
                             }
-                            // Se não tem horários específicos, conta cada turno geral como 1 turno por dia
+                            // Se não tem horários específicos, conta cada turno geral como 1 ponto por dia
                             // Cada turno geral = 1 disponibilidade para cada dia da semana
                             return total + (c.turnos?.length || 0);
                           }, 0)}
