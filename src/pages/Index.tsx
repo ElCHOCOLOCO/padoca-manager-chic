@@ -1104,6 +1104,117 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
           </TabsContent>
 
           <TabsContent value="escala" className="mt-6 space-y-6">
+            {/* Box de Estatísticas de Turnos */}
+            <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  📊 Estatísticas de Turnos Disponíveis
+                </CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Resumo da disponibilidade de turnos entre todos os camaradas
+                </p>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  {/* Total de Turnos Específicos */}
+                  <div className="bg-white p-4 rounded-lg border shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">Total de Turnos</p>
+                        <p className="text-2xl font-bold text-blue-600">
+                          {camaradas.reduce((total, c) => {
+                            if (c.horariosDisponiveis && c.horariosDisponiveis.length > 0) {
+                              return total + c.horariosDisponiveis.length;
+                            }
+                            return total + (c.turnos?.length || 0);
+                          }, 0)}
+                        </p>
+                        <p className="text-xs text-gray-500">Específicos + Gerais</p>
+                      </div>
+                      <div className="text-3xl">🎯</div>
+                    </div>
+                  </div>
+
+                  {/* Turnos por Manhã */}
+                  <div className="bg-white p-4 rounded-lg border shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">Manhã</p>
+                        <p className="text-2xl font-bold text-orange-600">
+                          {camaradas.reduce((total, c) => {
+                            if (c.horariosDisponiveis && c.horariosDisponiveis.length > 0) {
+                              return total + c.horariosDisponiveis.filter(h => h.turno === 'manha').length;
+                            }
+                            return total + (c.turnos?.includes('manha') ? 1 : 0);
+                          }, 0)}
+                        </p>
+                        <p className="text-xs text-gray-500">Disponibilidades</p>
+                      </div>
+                      <div className="text-3xl">🌅</div>
+                    </div>
+                  </div>
+
+                  {/* Turnos por Tarde */}
+                  <div className="bg-white p-4 rounded-lg border shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">Tarde</p>
+                        <p className="text-2xl font-bold text-yellow-600">
+                          {camaradas.reduce((total, c) => {
+                            if (c.horariosDisponiveis && c.horariosDisponiveis.length > 0) {
+                              return total + c.horariosDisponiveis.filter(h => h.turno === 'tarde').length;
+                            }
+                            return total + (c.turnos?.includes('tarde') ? 1 : 0);
+                          }, 0)}
+                        </p>
+                        <p className="text-xs text-gray-500">Disponibilidades</p>
+                      </div>
+                      <div className="text-3xl">☀️</div>
+                    </div>
+                  </div>
+
+                  {/* Turnos por Noite */}
+                  <div className="bg-white p-4 rounded-lg border shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">Noite</p>
+                        <p className="text-2xl font-bold text-purple-600">
+                          {camaradas.reduce((total, c) => {
+                            if (c.horariosDisponiveis && c.horariosDisponiveis.length > 0) {
+                              return total + c.horariosDisponiveis.filter(h => h.turno === 'noite').length;
+                            }
+                            return total + (c.turnos?.includes('noite') ? 1 : 0);
+                          }, 0)}
+                        </p>
+                        <p className="text-xs text-gray-500">Disponibilidades</p>
+                      </div>
+                      <div className="text-3xl">🌙</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Detalhamento por Dia */}
+                <div className="mt-4 p-4 bg-white rounded-lg border">
+                  <h4 className="font-medium text-gray-700 mb-3">📅 Distribuição por Dia da Semana</h4>
+                  <div className="grid grid-cols-5 gap-2 text-sm">
+                    {dias.map(dia => (
+                      <div key={dia} className="text-center">
+                        <p className="font-medium text-gray-600">{labelDia[dia]}</p>
+                        <p className="text-lg font-bold text-indigo-600">
+                          {camaradas.reduce((total, c) => {
+                            if (c.horariosDisponiveis && c.horariosDisponiveis.length > 0) {
+                              return total + c.horariosDisponiveis.filter(h => h.dia === dia).length;
+                            }
+                            return total + (c.turnos?.length || 0);
+                          }, 0)}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
             <div className="flex flex-col gap-6">
               <Card>
                 <CardHeader><CardTitle>Institutos</CardTitle></CardHeader>
