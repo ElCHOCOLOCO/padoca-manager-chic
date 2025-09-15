@@ -1126,9 +1126,9 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
                             if (c.horariosDisponiveis && c.horariosDisponiveis.length > 0) {
                               return total + c.horariosDisponiveis.length;
                             }
-                            // Se não tem horários específicos, conta baseado nos turnos gerais
-                            // Cada turno geral = 5 dias da semana (seg, ter, qua, qui, sex)
-                            return total + ((c.turnos?.length || 0) * 5);
+                            // Se não tem horários específicos, conta apenas os turnos gerais
+                            // Cada turno geral = 1 disponibilidade (não multiplica por dias)
+                            return total + (c.turnos?.length || 0);
                           }, 0)}
                         </p>
                         <p className="text-xs text-gray-500">Específicos + Gerais</p>
@@ -1147,9 +1147,8 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
                             if (c.horariosDisponiveis && c.horariosDisponiveis.length > 0) {
                               return total + c.horariosDisponiveis.filter(h => h.turno === 'manha').length;
                             }
-                            // Se não tem horários específicos, conta baseado nos turnos gerais
-                            // Cada turno geral de manhã = 5 dias da semana
-                            return total + (c.turnos?.includes('manha') ? 5 : 0);
+                            // Se não tem horários específicos, conta apenas se tem turno de manhã
+                            return total + (c.turnos?.includes('manha') ? 1 : 0);
                           }, 0)}
                         </p>
                         <p className="text-xs text-gray-500">Disponibilidades</p>
@@ -1168,9 +1167,8 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
                             if (c.horariosDisponiveis && c.horariosDisponiveis.length > 0) {
                               return total + c.horariosDisponiveis.filter(h => h.turno === 'tarde').length;
                             }
-                            // Se não tem horários específicos, conta baseado nos turnos gerais
-                            // Cada turno geral de tarde = 5 dias da semana
-                            return total + (c.turnos?.includes('tarde') ? 5 : 0);
+                            // Se não tem horários específicos, conta apenas se tem turno de tarde
+                            return total + (c.turnos?.includes('tarde') ? 1 : 0);
                           }, 0)}
                         </p>
                         <p className="text-xs text-gray-500">Disponibilidades</p>
@@ -1189,9 +1187,8 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
                             if (c.horariosDisponiveis && c.horariosDisponiveis.length > 0) {
                               return total + c.horariosDisponiveis.filter(h => h.turno === 'noite').length;
                             }
-                            // Se não tem horários específicos, conta baseado nos turnos gerais
-                            // Cada turno geral de noite = 5 dias da semana
-                            return total + (c.turnos?.includes('noite') ? 5 : 0);
+                            // Se não tem horários específicos, conta apenas se tem turno de noite
+                            return total + (c.turnos?.includes('noite') ? 1 : 0);
                           }, 0)}
                         </p>
                         <p className="text-xs text-gray-500">Disponibilidades</p>
@@ -1213,8 +1210,8 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
                             if (c.horariosDisponiveis && c.horariosDisponiveis.length > 0) {
                               return total + c.horariosDisponiveis.filter(h => h.dia === dia).length;
                             }
-                            // Se não tem horários específicos, conta baseado nos turnos gerais
-                            // Cada turno geral = 1 disponibilidade para cada dia da semana
+                            // Se não tem horários específicos, conta apenas os turnos gerais
+                            // Cada turno geral = 1 disponibilidade (não multiplica por dias)
                             return total + (c.turnos?.length || 0);
                           }, 0)}
                         </p>
