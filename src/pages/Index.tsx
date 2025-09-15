@@ -34,6 +34,13 @@ type HorarioDisponivel = {
   turno: Turno;
 };
 
+type TurnoDisponivel = {
+  id: string;
+  camarada_id: string;
+  dia: Dia;
+  turno: Turno;
+};
+
 type Camarada = { 
   id: string; 
   nome: string; 
@@ -50,6 +57,7 @@ const Index = () => {
 
   // Estados gerais
   const [camaradas, setCamaradas] = useState<Camarada[]>([]);
+  const [turnosDisponiveis, setTurnosDisponiveis] = useState<TurnoDisponivel[]>([]);
   const [institutos, setInstitutos] = useState<{ id: string; nome: string }[]>([]);
   const [escala, setEscala] = useState<{ id: string; camarada_id: string; instituto_id: string; turno: Turno; dia?: Dia }[]>([]);
   const [insumos, setInsumos] = useState<{ id: string; nome: string; custo_unitario: number }[]>([]);
@@ -76,6 +84,7 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
     try {
       const tables = [
         supabase.from("camaradas").select("id,nome,curso,turnos,horarios_disponiveis"),
+        supabase.from("turnos_disponiveis").select("id,camarada_id,dia,turno"),
         supabase.from("institutos").select("id,nome"),
         supabase.from("escala").select("id,camarada_id,instituto_id,turno,dia"),
         supabase.from("insumos").select("id,nome,custo_unitario"),
@@ -84,15 +93,16 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
         supabase.from("cas").select("id,nome,status,relacao,humor,desafios,oportunidades"),
         supabase.from("agenda").select("id,data,titulo,notas"),
       ];
-      const [c1,c2,c3,c4,c5,c6,c7,c8] = await Promise.all(tables);
+      const [c1,c2,c3,c4,c5,c6,c7,c8,c9] = await Promise.all(tables);
       if (!c1.error && c1.data) setCamaradas(c1.data as any);
-      if (!c2.error && c2.data) setInstitutos(c2.data as any);
-      if (!c3.error && c3.data) setEscala(c3.data as any);
-      if (!c4.error && c4.data) setInsumos(c4.data as any);
-      if (!c5.error && c5.data) setCustosFixos(c5.data as any);
-      if (!c6.error && c6.data) setVendas(c6.data as any);
-      if (!c7.error && c7.data) setCas(c7.data as any);
-      if (!c8.error && c8.data) setAgenda(c8.data as any);
+      if (!c2.error && c2.data) setTurnosDisponiveis(c2.data as any);
+      if (!c3.error && c3.data) setInstitutos(c3.data as any);
+      if (!c4.error && c4.data) setEscala(c4.data as any);
+      if (!c5.error && c5.data) setInsumos(c5.data as any);
+      if (!c6.error && c6.data) setCustosFixos(c6.data as any);
+      if (!c7.error && c7.data) setVendas(c7.data as any);
+      if (!c8.error && c8.data) setCas(c8.data as any);
+      if (!c9.error && c9.data) setAgenda(c9.data as any);
     } catch (e) {
       console.warn("Conecte o Supabase para sincronizar dados.");
     }
@@ -1122,15 +1132,7 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
                       <div>
                         <p className="text-sm font-medium text-gray-600">Total de Turnos</p>
                         <p className="text-2xl font-bold text-blue-600">
-                          {camaradas.reduce((total, c) => {
-                            if (c.horariosDisponiveis && c.horariosDisponiveis.length > 0) {
-                              // Conta cada horário específico como 1 ponto de disponibilidade
-                              return total + c.horariosDisponiveis.length;
-                            }
-                            // Se não tem horários específicos, conta cada turno geral como 5 pontos
-                            // Cada turno geral = 5 dias da semana (seg, ter, qua, qui, sex)
-                            return total + ((c.turnos?.length || 0) * 5);
-                          }, 0)}
+                          {turnosDisponiveis.length}
                         </p>
                         <p className="text-xs text-gray-500">Específicos + Gerais</p>
                       </div>
@@ -1144,14 +1146,7 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
                       <div>
                         <p className="text-sm font-medium text-gray-600">Manhã</p>
                         <p className="text-2xl font-bold text-orange-600">
-                          {camaradas.reduce((total, c) => {
-                            if (c.horariosDisponiveis && c.horariosDisponiveis.length > 0) {
-                              // Conta apenas os horários específicos de manhã
-                              return total + c.horariosDisponiveis.filter(h => h.turno === 'manha').length;
-                            }
-                            // Se não tem horários específicos, conta turno de manhã como 5 pontos
-                            return total + (c.turnos?.includes('manha') ? 5 : 0);
-                          }, 0)}
+                          {turnosDisponiveis.filter(t => t.turno === 'manha').length}
                         </p>
                         <p className="text-xs text-gray-500">Disponibilidades</p>
                       </div>
@@ -1165,14 +1160,7 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
                       <div>
                         <p className="text-sm font-medium text-gray-600">Tarde</p>
                         <p className="text-2xl font-bold text-yellow-600">
-                          {camaradas.reduce((total, c) => {
-                            if (c.horariosDisponiveis && c.horariosDisponiveis.length > 0) {
-                              // Conta apenas os horários específicos de tarde
-                              return total + c.horariosDisponiveis.filter(h => h.turno === 'tarde').length;
-                            }
-                            // Se não tem horários específicos, conta turno de tarde como 5 pontos
-                            return total + (c.turnos?.includes('tarde') ? 5 : 0);
-                          }, 0)}
+                          {turnosDisponiveis.filter(t => t.turno === 'tarde').length}
                         </p>
                         <p className="text-xs text-gray-500">Disponibilidades</p>
                       </div>
@@ -1186,14 +1174,7 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
                       <div>
                         <p className="text-sm font-medium text-gray-600">Noite</p>
                         <p className="text-2xl font-bold text-purple-600">
-                          {camaradas.reduce((total, c) => {
-                            if (c.horariosDisponiveis && c.horariosDisponiveis.length > 0) {
-                              // Conta apenas os horários específicos de noite
-                              return total + c.horariosDisponiveis.filter(h => h.turno === 'noite').length;
-                            }
-                            // Se não tem horários específicos, conta turno de noite como 5 pontos
-                            return total + (c.turnos?.includes('noite') ? 5 : 0);
-                          }, 0)}
+                          {turnosDisponiveis.filter(t => t.turno === 'noite').length}
                         </p>
                         <p className="text-xs text-gray-500">Disponibilidades</p>
                       </div>
@@ -1210,15 +1191,7 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
                       <div key={dia} className="text-center">
                         <p className="font-medium text-gray-600">{labelDia[dia]}</p>
                         <p className="text-lg font-bold text-indigo-600">
-                          {camaradas.reduce((total, c) => {
-                            if (c.horariosDisponiveis && c.horariosDisponiveis.length > 0) {
-                              // Conta apenas os horários específicos para este dia
-                              return total + c.horariosDisponiveis.filter(h => h.dia === dia).length;
-                            }
-                            // Se não tem horários específicos, conta cada turno geral como 1 ponto por dia
-                            // Cada turno geral = 1 disponibilidade para cada dia da semana
-                            return total + (c.turnos?.length || 0);
-                          }, 0)}
+                          {turnosDisponiveis.filter(t => t.dia === dia).length}
                         </p>
                       </div>
                     ))}
