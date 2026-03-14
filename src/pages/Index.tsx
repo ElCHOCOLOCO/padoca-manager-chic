@@ -21,6 +21,7 @@ import React, { Suspense, lazy } from "react";
 import PageTurn from "@/components/ui/PageTurn";
 import ShiftChecklist from "@/components/ShiftChecklist";
 import { speakSale } from "@/lib/voiceFeedback";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
 
 // Lazy loading para componentes pesados
 const ProjecaoVendas = lazy(() => import("@/components/vendas/ProjecaoVendas"));
@@ -82,6 +83,12 @@ const Index = () => {
   const [metaLucroBruto, setMetaLucroBruto] = useState<number | undefined>(undefined);
   const [metaLucroLiquido, setMetaLucroLiquido] = useState<number | undefined>(undefined);
   const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | undefined>(undefined);
+  const [checklistItems, setChecklistItems] = useState<{ id: string; label: string; checked: boolean }[]>([
+    { id: '1', label: 'Conferência de fundo de caixa', checked: false },
+    { id: '2', label: 'Verificação de validade dos insumos', checked: false },
+    { id: '3', label: 'Organização da área de vendas', checked: false },
+    { id: '4', label: 'Estoque de embalagens ok', checked: false },
+  ]);
 
   // Estados para edição
   const [editingCA, setEditingCA] = useState<string | null>(null);
@@ -140,6 +147,28 @@ const Index = () => {
   const lucroBrutoMes = useMemo(()=> receitaMes - custoVariavelMes, [receitaMes,custoVariavelMes]);
   const lucroLiquidoMes = useMemo(()=> receitaMes - custoVariavelMes - totalCustosFixos, [receitaMes,custoVariavelMes,totalCustosFixos]);
   const precoMedio = useMemo(()=> unidadesMes>0 ? receitaMes / unidadesMes : 0, [receitaMes, unidadesMes]);
+
+  // Estatísticas de Escala (Monitoramento)
+  const demandStats = useMemo(() => {
+    const totalSlots = institutos.length * 5 * 3; // 5 dias * 3 turnos
+    const occupiedSlots = escala.length;
+    const gap = totalSlots - occupiedSlots;
+    const occupancyRate = totalSlots > 0 ? (occupiedSlots / totalSlots) * 100 : 0;
+    
+    const breakdown = {
+      manha: { total: institutos.length * 5, occupied: escala.filter(e => e.turno === 'manha').length },
+      tarde: { total: institutos.length * 5, occupied: escala.filter(e => e.turno === 'tarde').length },
+      noite: { total: institutos.length * 5, occupied: escala.filter(e => e.turno === 'noite').length }
+    };
+
+    return { totalSlots, occupiedSlots, gap, occupancyRate, breakdown };
+  }, [institutos, escala]);
+
+  const chartData = useMemo(() => [
+    { name: 'Manhã', Demanda: demandStats.breakdown.manha.total, Ocupado: demandStats.breakdown.manha.occupied },
+    { name: 'Tarde', Demanda: demandStats.breakdown.tarde.total, Ocupado: demandStats.breakdown.tarde.occupied },
+    { name: 'Noite', Demanda: demandStats.breakdown.noite.total, Ocupado: demandStats.breakdown.noite.occupied },
+  ], [demandStats]);
 
   // Helpers
   const notifyOk = (msg: string) => toast({ title: msg });
@@ -364,13 +393,41 @@ const Index = () => {
 
           <TabsContent value="protocolo" className="mt-0 focus-visible:outline-none">
             <PageTurn pageKey="protocolo">
-              <div className="max-w-4xl mx-auto border-4 border-foreground p-8 bg-background shadow-[12px_12px_0px_0px_rgba(0,0,0,1)]">
-                <header className="border-b-4 border-foreground pb-6 mb-8 text-center">
-                  <h2 className="text-5xl font-black uppercase tracking-tighter italic">Protocolo de Operação</h2>
-                  <p className="text-lg opacity-80 mt-2 font-bold uppercase italic tracking-widest">Lista de Verificação Obrigatória do Turno</p>
-                </header>
-                <ShiftChecklist onComplete={() => notifyOk("Protocolo arquivado com sucesso.")} />
-              </div>
+                <div className="grid lg:grid-cols-12 gap-12">
+                  <div className="lg:col-span-7">
+                    <ShiftChecklist 
+                      items={checklistItems} 
+                      onToggle={(id) => setChecklistItems(prev => prev.map(item => item.id === id ? { ...item, checked: !item.checked } : item))}
+                      onRemove={(id) => setChecklistItems(prev => prev.filter(item => item.id !== id))}
+                      onComplete={() => notifyOk("Protocolo arquivado com sucesso.")} 
+                    />
+                  </div>
+                  <div className="lg:col-span-5">
+                    <Card className="border-4 border-foreground rounded-none bg-background shadow-none h-full">
+                      <CardHeader className="border-b-4 border-foreground bg-muted/50">
+                        <CardTitle className="text-xl font-black uppercase italic">Gerenciar Protocolo</CardTitle>
+                      </CardHeader>
+                      <CardContent className="pt-8">
+                        <form onSubmit={(e) => {
+                          e.preventDefault();
+                          const fd = new FormData(e.currentTarget);
+                          const label = String(fd.get('demanda')).trim();
+                          if (label) {
+                            setChecklistItems(prev => [...prev, { id: crypto.randomUUID(), label, checked: false }]);
+                            e.currentTarget.reset();
+                            notifyOk("Demanda incorporada ao protocolo.");
+                          }
+                        }} className="space-y-4">
+                          <div className="space-y-1">
+                            <Label className="text-[10px] font-black uppercase tracking-widest">Nova Demanda Operacional</Label>
+                            <Input name="demanda" placeholder="Ex: Higienização de bancadas" className="rounded-none border-2 border-foreground font-bold h-12 focus-visible:ring-0" />
+                          </div>
+                          <Button type="submit" className="w-full h-12 rounded-none bg-foreground text-background font-black uppercase italic hover:bg-background hover:text-foreground transition-all">Anexar ao Checklist</Button>
+                        </form>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
             </PageTurn>
           </TabsContent>
 
@@ -403,7 +460,7 @@ const Index = () => {
                                 <span className="text-[10px] font-black uppercase opacity-60 block mb-1">{labelDia[d]}</span>
                                 {["manha", "tarde", "noite"].map(t => (
                                   <div key={t} className="flex items-center justify-between gap-1 mb-1">
-                                    <span className="text-[8px] font-black opacity-40 uppercase">{t === 'manha' ? 'M' : t === 'tarde' ? 'T' : 'N'}</span>
+                                    <span className="text-[10px] font-black text-foreground uppercase">{t === 'manha' ? 'M' : t === 'tarde' ? 'T' : 'N'}</span>
                                     <input type="checkbox" name={`${d}-${t}`} className="w-4 h-4 accent-foreground cursor-pointer border-2 border-foreground rounded-none" title={`${labelDia[d]} - ${labelTurno[t as Turno]}`} />
                                   </div>
                                 ))}
@@ -748,9 +805,91 @@ const Index = () => {
             <PageTurn pageKey="escala">
                <div className="space-y-12">
                   <header className="border-double border-b-8 border-foreground pb-8 text-center max-w-4xl mx-auto">
-                    <h2 className="text-6xl font-black uppercase tracking-tighter italic italic">Plano de Escalonamento</h2>
-                    <p className="text-xl font-bold uppercase tracking-widest italic opacity-70">Distribuição racional da força de trabalho entre os polos acadêmicos.</p>
+                    <h2 className="text-6xl font-black uppercase tracking-tighter italic">Plano de Escalonamento</h2>
+                    <p className="text-xl font-bold uppercase tracking-widest italic opacity-70">Monitoramento racional da força de trabalho e demanda acadêmica.</p>
                   </header>
+
+                  {/* Dashboard de Monitoramento Visual */}
+                  <div className="grid lg:grid-cols-12 gap-8">
+                    <div className="lg:col-span-8 flex flex-col gap-8">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="border-4 border-foreground p-4 bg-background">
+                          <span className="block text-[10px] font-black uppercase tracking-widest opacity-60 mb-2">Demanda Total Vendida</span>
+                          <span className="text-5xl font-black italic">{demandStats.totalSlots}</span>
+                          <span className="block text-[10px] font-bold uppercase mt-1">Turnos em Institutos</span>
+                        </div>
+                        <div className="border-4 border-foreground p-4 bg-foreground text-background">
+                          <span className="block text-[10px] font-black uppercase tracking-widest opacity-60 mb-2">Ocupação Médica</span>
+                          <span className="text-5xl font-black italic">{demandStats.occupancyRate.toFixed(0)}%</span>
+                          <span className="block text-[10px] font-bold uppercase mt-1">{demandStats.occupiedSlots} de {demandStats.totalSlots} postos</span>
+                        </div>
+                        <div className="border-4 border-foreground p-4 bg-background">
+                          <span className="block text-[10px] font-black uppercase tracking-widest opacity-60 mb-2">Vagas Críticas</span>
+                          <span className="text-5xl font-black italic text-red-600">{demandStats.gap}</span>
+                          <span className="block text-[10px] font-bold uppercase mt-1">Lacunas de Cobertura</span>
+                        </div>
+                      </div>
+
+                      <Card className="border-4 border-foreground rounded-none bg-background shadow-none h-[400px]">
+                        <CardHeader className="bg-muted px-4 py-2 border-b-4 border-foreground">
+                          <CardTitle className="text-sm font-black uppercase italic tracking-widest">Infográfico: Equilíbrio de Turnos (Demanda vs Ocupação)</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-6 h-full pb-16">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={chartData}>
+                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#ccc" />
+                              <XAxis dataKey="name" tick={{fontFamily: 'Playfair Display', fontWeight: 'bold'}} />
+                              <YAxis tick={{fontFamily: 'serif'}} />
+                              <Tooltip cursor={{fill: '#f0f0f0'}} contentStyle={{backgroundColor: '#fff', border: '2px solid #000', borderRadius: '0'}} />
+                              <Legend wrapperStyle={{paddingTop: '20px', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '10px'}} />
+                              <Bar dataKey="Demanda" fill="#e2e2e2" stroke="#000" strokeWidth={2} />
+                              <Bar dataKey="Ocupado" fill="#000" />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    <div className="lg:col-span-4 space-y-6">
+                      <div className="border-4 border-foreground p-6 bg-background space-y-4">
+                        <h4 className="text-xl font-black uppercase border-b-2 border-foreground pb-2 italic">Saúde de Cobertura / Polos</h4>
+                        <div className="space-y-4 overflow-y-auto max-h-[500px] pr-2">
+                          {institutos.map(inst => {
+                            const instEscala = escala.filter(e => e.instituto_id === inst.id).length;
+                            const totalInst = 5 * 3; // 5 dias * 3 turnos
+                            const health = (instEscala / totalInst) * 100;
+                            return (
+                              <div key={inst.id} className="space-y-1">
+                                <div className="flex justify-between text-[10px] font-black uppercase italic">
+                                  <span>{inst.nome}</span>
+                                  <span>{instEscala}/{totalInst}</span>
+                                </div>
+                                <div className="h-4 border-2 border-foreground bg-muted overflow-hidden">
+                                  <div 
+                                    className={cn("h-full transition-all duration-1000", health > 70 ? 'bg-green-600' : health > 30 ? 'bg-yellow-500' : 'bg-red-600')} 
+                                    style={{ width: `${health}%` }}
+                                  />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <div className="border-4 border-foreground p-6 bg-red-600 text-white">
+                        <h4 className="text-xl font-black uppercase underline decoration-2 underline-offset-4 mb-4 italic">Chamado às Armas: Lacunas</h4>
+                        <div className="space-y-2 text-xs font-bold uppercase tracking-tighter">
+                          {demandStats.gap > 0 ? (
+                            <>
+                              <p>Total de {demandStats.gap} turnos vagos em institutos ativos. Priorizar comissão de camaradas para os turnos de {demandStats.breakdown.manha.occupied < demandStats.breakdown.manha.total ? 'Manhã' : demandStats.breakdown.tarde.occupied < demandStats.breakdown.tarde.total ? 'Tarde' : 'Noite'}.</p>
+                            </>
+                          ) : (
+                            <p>Todos os postos de venda ocupados. Operação em capacidade plena.</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
 
                   <div className="grid lg:grid-cols-12 gap-8">
                     <div className="lg:col-span-4 space-y-8">
