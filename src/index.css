@@ -100,4 +100,66 @@ All colors MUST be HSL.
   .ink-shadow {
     box-shadow: 2px 2px 0px 0px rgba(0,0,0,0.1);
   }
+  
+  /* Paper Grain Texture */
+  .paper-grain::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    opacity: 0.05;
+    z-index: 9999;
+    background-image: url("https://www.transparenttextures.com/patterns/paper-fibers.png");
+  }
+
+  /* Typewriter Animation */
+  .typewriter {
+    overflow: hidden;
+    border-right: .15em solid hsl(var(--primary));
+    white-space: nowrap;
+    margin: 0 auto;
+    letter-spacing: .15em;
+    animation: 
+      typing 3.5s steps(40, end),
+      blink-caret .75s step-end infinite;
+  }
+
+  @keyframes typing {
+    from { width: 0 }
+    to { width: 100% }
+  }
+
+  @keyframes blink-caret {
+    from, to { border-color: transparent }
+    50% { border-color: hsl(var(--primary)) }
+  }
+
+  /* Rubber Stamp Animation */
+  .rubber-stamp {
+    position: relative;
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    border: 0.4rem double #d00;
+    color: #d00;
+    font-family: 'Courier New', Courier, monospace;
+    font-weight: 900;
+    text-transform: uppercase;
+    transform: rotate(-15deg);
+    opacity: 0;
+    animation: stamp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  }
+
+  @keyframes stamp {
+    0% {
+      opacity: 0;
+      transform: scale(2) rotate(-30deg);
+    }
+    100% {
+      opacity: 0.8;
+      transform: scale(1) rotate(-15deg);
+    }
+  }
 }

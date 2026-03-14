@@ -12,11 +12,13 @@ interface ChecklistItem {
 
 const ShiftChecklist = ({ 
   items, 
+  title = "Protocolo de Operação",
   onToggle, 
   onRemove,
   onComplete 
 }: { 
   items: ChecklistItem[]; 
+  title?: string;
   onToggle: (id: string) => void;
   onRemove?: (id: string) => void;
   onComplete: () => void;
@@ -26,7 +28,7 @@ const ShiftChecklist = ({
   return (
     <Card className="border-4 border-foreground rounded-none bg-background shadow-none animate-in slide-in-from-top duration-500">
       <CardHeader className="bg-foreground text-background py-4">
-        <CardTitle className="text-2xl font-black uppercase italic">Protocolo de Operação</CardTitle>
+        <CardTitle className="text-2xl font-black uppercase italic">{title}</CardTitle>
       </CardHeader>
       <CardContent className="pt-8 space-y-4">
         {items.map(item => (

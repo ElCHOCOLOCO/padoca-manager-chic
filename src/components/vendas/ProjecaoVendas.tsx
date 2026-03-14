@@ -8,7 +8,20 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, TrendingUp, TrendingDown, Target, BarChart3, RefreshCw, Save, X, History, Calendar } from "lucide-react";
+import { 
+  Loader2, 
+  TrendingUp, 
+  TrendingDown, 
+  Target, 
+  BarChart3, 
+  RefreshCw, 
+  Save, 
+  X, 
+  History, 
+  Calendar,
+  Mic,
+  MicOff
+} from "lucide-react";
 import TesteConexao from "./TesteConexao";
 
 type InstitutoVenda = {
@@ -207,6 +220,51 @@ function ProjecaoVendas() {
 
   // Estados para edição inline
   const [editingCell, setEditingCell] = useState<{instituto: string, dia: string} | null>(null);
+
+  // Comando de Voz
+  const [isListening, setIsListening] = useState(false);
+  const [lastTranscript, setLastTranscript] = useState("");
+
+  const startListening = useCallback(() => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      toast({ title: "Erro", description: "Reconhecimento de voz não suportado neste navegador." });
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'pt-BR';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => setIsListening(true);
+    recognition.onend = () => setIsListening(false);
+    
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript.toLowerCase();
+      setLastTranscript(transcript);
+      console.log("🎤 Voz capturada:", transcript);
+      
+      // Processamento simples: "Código X Vendas Y" ou similar
+      // Ex: "I001 vendeu 50"
+      const match = transcript.match(/([a-z]\d+)\s+(?:vendeu|vendas|venda)\s+(\d+)/);
+      if (match) {
+        const codigo = match[1].toUpperCase();
+        const valor = parseInt(match[2]);
+        const inst = institutos.find(i => i.codigo === codigo);
+        if (inst) {
+          handleSaveVenda(inst.id, diasSemana[new Date().getDay() - 1] || 'seg', inst.turno, 0, valor);
+          toast({ title: "Comando de Voz", description: `Venda de ${valor} registrada para ${codigo}` });
+        } else {
+          toast({ title: "Erro de Voz", description: `Instituto ${codigo} não encontrado.` });
+        }
+      } else {
+        toast({ title: "Comando não reconhecido", description: `Tente falar: "F001 vendeu 50"` });
+      }
+    };
+
+    recognition.start();
+  }, [institutos]);
 
   // Carregar dados
   const loadData = useCallback(async () => {
@@ -566,6 +624,15 @@ function ProjecaoVendas() {
             <RefreshCw className="h-4 w-4" />
             Atualizar
           </Button>
+          <Button
+            variant={isListening ? "destructive" : "outline"}
+            size="sm"
+            onClick={startListening}
+            className="flex items-center gap-2"
+          >
+            {isListening ? <MicOff className="h-4 w-4 animate-pulse" /> : <Mic className="h-4 w-4" />}
+            {isListening ? "Ouvindo..." : "Voz"}
+          </Button>
         </div>
       </div>
 
@@ -776,6 +843,48 @@ function ProjecaoVendas() {
                       </div>
                     </div>
                   ))}
+                </div>
+              </div>
+
+              <div className="mt-8">
+                <h3 className="font-medium mb-4 flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4" /> Mapa de Calor de Vendas (Heatmap)
+                </h3>
+                <div className="overflow-x-auto">
+                  <div className="min-w-[600px] border-2 border-foreground/10 p-4 bg-muted/10">
+                    <div className="grid grid-cols-[100px_repeat(5,1fr)] gap-1">
+                      <div className="h-8"></div>
+                      {diasSemana.map(d => <div key={d} className="h-8 flex items-center justify-center text-xs font-bold uppercase">{labelDia[d]}</div>)}
+                      
+                      {['manha', 'tarde', 'noite'].map(t => (
+                        <React.Fragment key={t}>
+                          <div className="h-16 flex items-center text-xs font-black uppercase italic">{labelTurno[t]}</div>
+                          {diasSemana.map(d => {
+                            const totalVendas = historico
+                              .filter(h => h.dia === d && h.turno === t)
+                              .reduce((sum, h) => sum + h.vendeu, 0);
+                            
+                            const maxVendas = Math.max(...performancePorTurno.map(p => p.totalVendido), 100);
+                            const intensity = Math.min(1, totalVendas / (maxVendas / 3));
+                            
+                            return (
+                              <div 
+                                key={`${d}-${t}`} 
+                                className="h-16 border border-foreground/5 flex flex-col items-center justify-center transition-all hover:scale-105 hover:z-10"
+                                style={{ 
+                                  backgroundColor: totalVendas > 0 ? `rgba(22, 163, 74, ${Math.max(0.1, intensity)})` : 'transparent',
+                                  color: intensity > 0.5 ? 'white' : 'black'
+                                }}
+                              >
+                                <span className="text-lg font-black">{totalVendas}</span>
+                                {totalVendas > 0 && <span className="text-[10px] uppercase font-bold opacity-70">unid</span>}
+                              </div>
+                            );
+                          })}
+                        </React.Fragment>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
             </CardContent>

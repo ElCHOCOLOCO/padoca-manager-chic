@@ -21,7 +21,7 @@ try {
   
   console.log('📦 Committing changes...');
   execSync('git add .');
-  execSync('git commit -m "feat: V4.1 Refinements - Checklist rename, M|T|N labels, and CA CRUD"');
+  execSync('git commit -m "feat: Marx Gestão V4.5 - Voice commands and Sales Heatmap"');
   
   console.log('🚀 Pushing to GitHub...');
   // Use x-access-token and disable terminal prompt to ensure non-interactive push
