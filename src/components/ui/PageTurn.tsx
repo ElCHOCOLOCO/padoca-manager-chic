@@ -11,20 +11,17 @@ const PageTurn = ({ children, pageKey }: PageTurnProps) => {
     <AnimatePresence mode="wait">
       <motion.div
         key={pageKey}
-        initial={{ rotateY: 90, opacity: 0, scale: 0.95 }}
-        animate={{ rotateY: 0, opacity: 1, scale: 1 }}
-        exit={{ rotateY: -90, opacity: 0, scale: 0.95 }}
+        initial={{ rotateY: -110, opacity: 0, x: "20%" }}
+        animate={{ rotateY: 0, opacity: 1, x: 0 }}
+        exit={{ rotateY: 110, opacity: 0, x: "-20%" }}
         transition={{ 
-          duration: 0.4, 
-          ease: "easeInOut",
-          type: "spring",
-          stiffness: 100,
-          damping: 20
+          duration: 0.7, 
+          ease: [0.4, 0, 0.2, 1], // Custom cubic-bezier for a physical "paper" feel
         }}
-        style={{ transformOrigin: "left center", perspective: "1200px" }}
-        className="w-full h-full bg-background"
+        style={{ transformOrigin: "right center", perspective: "2000px" }}
+        className="w-full h-full bg-background relative overflow-hidden"
       >
-        <div className="border-l-4 border-foreground/10 pl-4 h-full">
+        <div className="border-r-4 border-foreground/5 pr-4 h-full">
           {children}
         </div>
       </motion.div>
