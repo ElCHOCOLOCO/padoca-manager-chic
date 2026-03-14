@@ -20,6 +20,9 @@ import IntegrationTab from "@/components/integration/IntegrationTab";
 import ThemeToggle from "@/components/ThemeToggle";
 import { supabase as supabaseClient } from "@/integrations/supabase/client";
 import React, { Suspense, lazy } from "react";
+import PageTurn from "@/components/ui/PageTurn";
+import ShiftChecklist from "@/components/ShiftChecklist";
+import { speakSale } from "@/lib/voiceFeedback";
 
 // Lazy loading para componentes pesados
 const ProjecaoVendas = lazy(() => import("@/components/vendas/ProjecaoVendas"));
@@ -51,7 +54,7 @@ type Camarada = {
 
 const Index = () => {
   useEffect(() => {
-    document.title = "Gestão de Padaria – Painel";
+    document.title = "Marx Gestão – Crônicas da Padaria";
   }, []);
   const todayLabel = format(new Date(), "dd/MM/yyyy");
 
@@ -76,6 +79,7 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
   const [editingEscala, setEditingEscala] = useState<string | null>(null);
   const [editingCamarada, setEditingCamarada] = useState<Camarada | null>(null);
   const [activeView, setActiveView] = useState<'camaradas' | 'institutos' | 'turnos' | 'estatisticas'>('camaradas');
+  const [showChecklist, setShowChecklist] = useState(true);
 
   const supabase: any = supabaseClient as any;
 
@@ -388,6 +392,7 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
     if(error) return notifyErr(error.message);
     setVendas((p)=>[...(d as any), ...p]);
     e.currentTarget?.reset();
+    speakSale(`${unidades} unidades registradas`);
     notifyOk("Venda registrada!");
   };
 
@@ -522,322 +527,135 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
 
   return (
     <main id="main" className="min-h-screen bg-background" role="main">
-      <header className="container py-10 border-y">
-        <div className="flex items-end justify-between">
-          <h1 className="text-5xl font-bold font-playfair tracking-tight">Gestão de Padaria</h1>
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-muted-foreground" aria-live="polite">{todayLabel}</span>
-            <ThemeToggle />
+      <header className="container py-8 border-b-4 border-foreground">
+        <div className="flex flex-col md:flex-row items-center justify-between border-b pb-4 mb-4">
+          <div className="text-sm font-bold tracking-widest uppercase">Volume I • No. 001</div>
+          <h1 className="text-6xl md:text-8xl font-bold font-serif tracking-tighter text-center my-4 md:my-0">
+            Marx Gestão
+          </h1>
+          <div className="flex flex-col items-end">
+            <div className="text-sm font-bold tracking-widest uppercase">{todayLabel}</div>
+            <div className="flex items-center gap-2 mt-2">
+              <ThemeToggle />
+            </div>
           </div>
         </div>
-        <p className="text-muted-foreground mt-2">Cadastro, financeiro, CAs, escala e agenda — rápido e simples.</p>
+        <div className="flex justify-between items-center text-xs font-bold uppercase tracking-widest py-2 border-y">
+          <span>Cadernos de Gestão</span>
+          <span className="hidden md:inline">Onde o Pão Encontra a Teoria</span>
+          <span>Edição de Hoje</span>
+        </div>
       </header>
 
-      <section className="container pb-20">
+      <section className="container py-8">
         <Tabs defaultValue="camaradas" className="w-full" activationMode="automatic">
-          <TabsList className="grid grid-cols-8 sticky top-0 z-20 bg-background/80 backdrop-blur border-b rounded-none" role="tablist" aria-label="Seções do painel">
-            <TabsTrigger value="camaradas">Camaradas</TabsTrigger>
-            <TabsTrigger value="financeiro">Financeiro</TabsTrigger>
-            <TabsTrigger value="vendas">Vendas</TabsTrigger>
-            <TabsTrigger value="entradas">Entradas</TabsTrigger>
-            <TabsTrigger value="integracao">Integração</TabsTrigger>
-            <TabsTrigger value="cas">CAs</TabsTrigger>
-            <TabsTrigger value="escala">Escala</TabsTrigger>
-            <TabsTrigger value="agenda">Agenda</TabsTrigger>
+          <TabsList className="flex flex-wrap h-auto gap-2 bg-transparent border-b-2 border-foreground mb-8 pb-2 rounded-none justify-start" role="tablist">
+            {["camaradas", "financeiro", "vendas", "entradas", "integracao", "cas", "escala", "agenda"].map((tab) => (
+              <TabsTrigger 
+                key={tab}
+                value={tab} 
+                className="font-serif text-lg border-2 border-transparent data-[state=active]:border-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-none px-4 py-1 transition-all"
+              >
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              </TabsTrigger>
+            ))}
           </TabsList>
 
 
           <TabsContent value="camaradas" className="mt-6 space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Cadastro de camaradas</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Cadastre camaradas e defina seus horários específicos de disponibilidade
-                </p>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={addCamarada} className="space-y-6">
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="nome">Nome</Label>
-                      <Input id="nome" name="nome" placeholder="Ex: João" />
-                    </div>
-                    <div>
-                      <Label htmlFor="curso">Curso</Label>
-                      <Input id="curso" name="curso" placeholder="Ex: Engenharia" />
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <Label className="text-base font-medium">Turnos Gerais</Label>
-                    <p className="text-sm text-muted-foreground mb-3">Selecione os turnos que o camarada pode trabalhar</p>
-                    <div className="flex items-center gap-6">
-                      <div className="flex items-center gap-2">
-                        <input type="checkbox" name="manha" id="manha" />
-                        <Label htmlFor="manha">Manhã</Label>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <input type="checkbox" name="tarde" id="tarde" />
-                        <Label htmlFor="tarde">Tarde</Label>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <input type="checkbox" name="noite" id="noite" />
-                        <Label htmlFor="noite">Noite</Label>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label className="text-base font-medium">Horários Específicos</Label>
-                    <p className="text-sm text-muted-foreground mb-3">
-                      Selecione os horários exatos de disponibilidade (dia + turno)
-                    </p>
-                    <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                      {dias.map(dia => (
-                        <div key={dia} className="space-y-2">
-                          <Label className="font-medium text-center block">{labelDia[dia]}</Label>
-                          {(["manha", "tarde", "noite"] as Turno[]).map(turno => (
-                            <div key={turno} className="flex items-center gap-2">
-                              <input 
-                                type="checkbox" 
-                                name={`${dia}-${turno}`} 
-                                id={`${dia}-${turno}`}
-                                className="rounded"
-                              />
-                              <Label htmlFor={`${dia}-${turno}`} className="text-sm">
-                                {labelTurno[turno]}
-                              </Label>
+            <PageTurn pageKey="camaradas">
+              {showChecklist ? (
+                <ShiftChecklist onComplete={() => setShowChecklist(false)} />
+              ) : (
+                <div className="space-y-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Cadastro de camaradas</CardTitle>
+                      <p className="text-sm text-muted-foreground">
+                        Cadastre camaradas e defina seus horários específicos de disponibilidade
+                      </p>
+                    </CardHeader>
+                    <CardContent>
+                      <form onSubmit={addCamarada} className="space-y-4">
+                        <div className="grid md:grid-cols-2 gap-4">
+                          <Input name="nome" placeholder="Nome" />
+                          <Input name="curso" placeholder="Curso" />
+                        </div>
+                        <div className="flex gap-4">
+                          {["manha", "tarde", "noite"].map(t => (
+                            <div key={t} className="flex items-center gap-2">
+                              <input type="checkbox" name={t} id={t} />
+                              <Label htmlFor={t}>{labelTurno[t as Turno]}</Label>
                             </div>
                           ))}
                         </div>
-                      ))}
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      💡 Dica: Selecione apenas os horários que o camarada realmente pode trabalhar
-                    </p>
-                  </div>
+                        <Button type="submit">Adicionar Camarada</Button>
+                      </form>
+                    </CardContent>
+                  </Card>
                   
-                  <div className="flex justify-end">
-                    <Button type="submit">Salvar Camarada</Button>
-                  </div>
-                </form>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Lista de Camaradas</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Visualize todos os camaradas cadastrados e seus horários de disponibilidade
-                </p>
-              </CardHeader>
-              <CardContent>
-                <Table aria-labelledby="titulo-camaradas">
-                  <TableCaption id="titulo-camaradas">Lista de camaradas cadastrados</TableCaption>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Nome</TableHead>
-                      <TableHead>Curso</TableHead>
-                      <TableHead>Turnos Gerais</TableHead>
-                      <TableHead>Horários Específicos</TableHead>
-                      <TableHead>Ações</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {camaradas.map(c=> (
-                      <TableRow key={c.id}>
-                        <TableCell className="font-medium">{c.nome}</TableCell>
-                        <TableCell>{c.curso}</TableCell>
-                        <TableCell className="space-x-1">
-                          {c.turnos?.map(t=> <Badge key={t} variant="secondary" className="text-xs">{labelTurno[t]}</Badge>)}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap gap-1">
-                            {c.horariosDisponiveis?.map((h, idx) => (
-                              <Badge key={idx} variant="outline" className="text-xs">
-                                {labelDia[h.dia]} {labelTurno[h.turno]}
-                              </Badge>
-                            ))}
-                            {(!c.horariosDisponiveis || c.horariosDisponiveis.length === 0) && (
-                              <Badge variant="secondary" className="text-xs">
-                                Apenas turnos gerais
-                              </Badge>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setEditingCamarada(c)}
-                            >
-                              Editar
-                            </Button>
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={() => deleteCamarada(c.id, c.nome)}
-                            >
-                              Excluir
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-
-            {/* Modal de Edição de Camarada */}
-            {editingCamarada && (
-              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                <div className="bg-background p-6 rounded-lg max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-                  <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl font-semibold">Editar Camarada</h2>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setEditingCamarada(null)}
-                    >
-                      ✕
-                    </Button>
-                  </div>
-                  
-                  <form onSubmit={updateCamarada} className="space-y-6">
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="edit-nome">Nome</Label>
-                        <Input 
-                          id="edit-nome" 
-                          name="edit-nome" 
-                          defaultValue={editingCamarada.nome}
-                          placeholder="Ex: João" 
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="edit-curso">Curso</Label>
-                        <Input 
-                          id="edit-curso" 
-                          name="edit-curso" 
-                          defaultValue={editingCamarada.curso}
-                          placeholder="Ex: Engenharia" 
-                        />
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <Label className="text-base font-medium">Turnos Gerais</Label>
-                      <p className="text-sm text-muted-foreground mb-3">Selecione os turnos que o camarada pode trabalhar</p>
-                      <div className="flex items-center gap-6">
-                        <div className="flex items-center gap-2">
-                          <input 
-                            type="checkbox" 
-                            name="edit-manha" 
-                            id="edit-manha" 
-                            defaultChecked={editingCamarada.turnos?.includes("manha")}
-                          />
-                          <Label htmlFor="edit-manha">Manhã</Label>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <input 
-                            type="checkbox" 
-                            name="edit-tarde" 
-                            id="edit-tarde" 
-                            defaultChecked={editingCamarada.turnos?.includes("tarde")}
-                          />
-                          <Label htmlFor="edit-tarde">Tarde</Label>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <input 
-                            type="checkbox" 
-                            name="edit-noite" 
-                            id="edit-noite" 
-                            defaultChecked={editingCamarada.turnos?.includes("noite")}
-                          />
-                          <Label htmlFor="edit-noite">Noite</Label>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label className="text-base font-medium">Horários Específicos</Label>
-                      <p className="text-sm text-muted-foreground mb-3">
-                        Selecione os horários exatos de disponibilidade (dia + turno)
-                      </p>
-                      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                        {dias.map(dia => (
-                          <div key={dia} className="space-y-2">
-                            <Label className="font-medium text-center block">{labelDia[dia]}</Label>
-                            {(["manha", "tarde", "noite"] as Turno[]).map(turno => (
-                              <div key={turno} className="flex items-center gap-2">
-                                <input 
-                                  type="checkbox" 
-                                  name={`edit-${dia}-${turno}`} 
-                                  id={`edit-${dia}-${turno}`}
-                                  className="rounded"
-                                  defaultChecked={editingCamarada.horariosDisponiveis?.some(h => h.dia === dia && h.turno === turno)}
-                                />
-                                <Label htmlFor={`edit-${dia}-${turno}`} className="text-sm">
-                                  {labelTurno[turno]}
-                                </Label>
-                              </div>
-                            ))}
-                          </div>
-                        ))}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-2">
-                        💡 Dica: Selecione apenas os horários que o camarada realmente pode trabalhar
-                      </p>
-                    </div>
-                    
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setEditingCamarada(null)}
-                      >
-                        Cancelar
-                      </Button>
-                      <Button type="submit">Salvar Alterações</Button>
-                    </div>
-                  </form>
+                  <Card>
+                    <CardHeader><CardTitle>Lista de Camaradas</CardTitle></CardHeader>
+                    <CardContent>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Nome</TableHead>
+                            <TableHead>Curso</TableHead>
+                            <TableHead>Ações</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {camaradas.map(c => (
+                            <TableRow key={c.id}>
+                              <TableCell>{c.nome}</TableCell>
+                              <TableCell>{c.curso}</TableCell>
+                              <TableCell>
+                                <Button variant="destructive" size="sm" onClick={() => deleteCamarada(c.id, c.nome)}>Excluir</Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  </Card>
                 </div>
-              </div>
-            )}
+              )}
+            </PageTurn>
           </TabsContent>
 
           <TabsContent value="financeiro" className="mt-6 space-y-6">
-            <div className="flex flex-col gap-8">
-              <Card className="hover:shadow-md transition-shadow animate-fade-in">
-                <CardHeader><CardTitle>Resumo do mês</CardTitle></CardHeader>
-                <CardContent className="space-y-2">
-                  <div>Receita: <strong>R$ {receitaMes.toFixed(2)}</strong></div>
-                  <div>Custo variável: <strong>R$ {custoVariavelMes.toFixed(2)}</strong></div>
-                  <div>Custos fixos: <strong>R$ {totalCustosFixos.toFixed(2)}</strong></div>
-                  <div>Lucro bruto: <strong>R$ {lucroBrutoMes.toFixed(2)}</strong></div>
-                  <div>Lucro líquido: <strong>R$ {lucroLiquidoMes.toFixed(2)}</strong></div>
-                  <div>Custo fixo diluído/unid.: <strong>R$ {custoFixoDilPorUnid.toFixed(2)}</strong></div>
-                </CardContent>
-              </Card>
+            <PageTurn pageKey="financeiro">
+              <div className="flex flex-col gap-8">
+                {/* ... existing finance content ... */}
+                <Card className="hover:shadow-md transition-shadow animate-fade-in">
+                  <CardHeader><CardTitle>Resumo do mês</CardTitle></CardHeader>
+                  <CardContent className="space-y-2">
+                    <div>Receita: <strong>R$ {receitaMes.toFixed(2)}</strong></div>
+                    <div>Custo variável: <strong>R$ {custoVariavelMes.toFixed(2)}</strong></div>
+                    <div>Custos fixos: <strong>R$ {totalCustosFixos.toFixed(2)}</strong></div>
+                    <div>Lucro bruto: <strong>R$ {lucroBrutoMes.toFixed(2)}</strong></div>
+                    <div>Lucro líquido: <strong>R$ {lucroLiquidoMes.toFixed(2)}</strong></div>
+                    <div>Custo fixo diluído/unid.: <strong>R$ {custoFixoDilPorUnid.toFixed(2)}</strong></div>
+                  </CardContent>
+                </Card>
 
-              <Card className="animate-fade-in">
-                <CardHeader><CardTitle>Insumos (14 componentes)</CardTitle></CardHeader>
-                <CardContent>
-                  <InsumosTabela14 />
-                </CardContent>
-              </Card>
+                <Card className="animate-fade-in">
+                  <CardHeader><CardTitle>Insumos (14 componentes)</CardTitle></CardHeader>
+                  <CardContent>
+                    <InsumosTabela14 />
+                  </CardContent>
+                </Card>
 
-              <Card className="animate-fade-in">
-                <CardHeader><CardTitle>Custos fixos (mensal)</CardTitle></CardHeader>
-                <CardContent className="space-y-4">
-                  <form onSubmit={addCustoFixo} className="grid grid-cols-3 gap-2">
-                    <Input name="nome" placeholder="Nome" />
-                    <Input name="valor" type="number" step="0.01" placeholder="R$" />
-                    <Button type="submit">Adicionar</Button>
-                  </form>
-                                      <Table aria-labelledby="titulo-custos">
+                <Card className="animate-fade-in">
+                  <CardHeader><CardTitle>Custos fixos (mensal)</CardTitle></CardHeader>
+                  <CardContent className="space-y-4">
+                    <form onSubmit={addCustoFixo} className="grid grid-cols-3 gap-2">
+                      <Input name="nome" placeholder="Nome" />
+                      <Input name="valor" type="number" step="0.01" placeholder="R$" />
+                      <Button type="submit">Adicionar</Button>
+                    </form>
+                    <Table aria-labelledby="titulo-custos">
                       <TableCaption id="titulo-custos">Lista de custos fixos mensais</TableCaption>
                       <TableHeader>
                         <TableRow>
@@ -865,90 +683,91 @@ const [custoVariavelOverride, setCustoVariavelOverride] = useState<number | unde
                         ))}
                       </TableBody>
                     </Table>
-</CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
 
-              <Card className="animate-fade-in">
-                <CardHeader><CardTitle>Parâmetros e metas</CardTitle></CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <Label>Meta lucro bruto (mês)</Label>
-                      <Input type="number" step="0.01" value={metaLucroBruto ?? ''} onChange={(e)=> setMetaLucroBruto(e.target.value===''? undefined : Number(e.target.value))} placeholder="R$" />
+                <Card className="animate-fade-in">
+                  <CardHeader><CardTitle>Parâmetros e metas</CardTitle></CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <Label>Meta lucro bruto (mês)</Label>
+                        <Input type="number" step="0.01" value={metaLucroBruto ?? ''} onChange={(e)=> setMetaLucroBruto(e.target.value===''? undefined : Number(e.target.value))} placeholder="R$" />
+                      </div>
+                      <div>
+                        <Label>Meta lucro líquido (mês)</Label>
+                        <Input type="number" step="0.01" value={metaLucroLiquido ?? ''} onChange={(e)=> setMetaLucroLiquido(e.target.value===''? undefined : Number(e.target.value))} placeholder="R$" />
+                      </div>
+                      <div className="col-span-2">
+                        <Label>Override de custo variável por unidade (opcional)</Label>
+                        <Input type="number" step="0.01" value={custoVariavelOverride ?? ''} onChange={(e)=> setCustoVariavelOverride(e.target.value===''? undefined : Number(e.target.value))} placeholder={`Atual: R$ ${custoVariavelPorUnidade.toFixed(2)}`} />
+                      </div>
                     </div>
-                    <div>
-                      <Label>Meta lucro líquido (mês)</Label>
-                      <Input type="number" step="0.01" value={metaLucroLiquido ?? ''} onChange={(e)=> setMetaLucroLiquido(e.target.value===''? undefined : Number(e.target.value))} placeholder="R$" />
-                    </div>
-                    <div className="col-span-2">
-                      <Label>Override de custo variável por unidade (opcional)</Label>
-                      <Input type="number" step="0.01" value={custoVariavelOverride ?? ''} onChange={(e)=> setCustoVariavelOverride(e.target.value===''? undefined : Number(e.target.value))} placeholder={`Atual: R$ ${custoVariavelPorUnidade.toFixed(2)}`} />
-                    </div>
-                  </div>
-                  <Button type="button" variant="secondary" onClick={()=> notifyOk("Parâmetros aplicados.")}>Aplicar</Button>
-                </CardContent>
-              </Card>
+                    <Button type="button" variant="secondary" onClick={()=> notifyOk("Parâmetros aplicados.")}>Aplicar</Button>
+                  </CardContent>
+                </Card>
 
-              <Card className="animate-fade-in">
-                <CardHeader><CardTitle>Balanço e compatibilidade</CardTitle></CardHeader>
-                <CardContent className="space-y-2 text-sm">
-                  <div className="flex justify-between"><span>Entradas (receita)</span><strong>R$ {receitaMes.toFixed(2)}</strong></div>
-                  <div className="flex justify-between"><span>Saídas variáveis</span><strong>R$ {custoVariavelMes.toFixed(2)}</strong></div>
-                  <div className="flex justify-between"><span>Saídas fixas</span><strong>R$ {totalCustosFixos.toFixed(2)}</strong></div>
-                  <div className="flex justify-between border-t pt-2"><span>Lucro bruto</span><strong>R$ {lucroBrutoMes.toFixed(2)}</strong></div>
-                  <div className="flex justify-between"><span>Lucro líquido</span><strong>R$ {lucroLiquidoMes.toFixed(2)}</strong></div>
-                  <div className="text-muted-foreground">Preço médio: R$ {precoMedio.toFixed(2)} • Unidades mês: {unidadesMes}</div>
-                  <div className="mt-2">
-                    {metaLucroBruto !== undefined || metaLucroLiquido !== undefined ? (
-                      <Badge variant={(metaLucroBruto !== undefined && lucroBrutoMes < metaLucroBruto) || (metaLucroLiquido !== undefined && lucroLiquidoMes < metaLucroLiquido) ? 'destructive' : 'default'}>
-                        { (metaLucroBruto !== undefined && lucroBrutoMes < metaLucroBruto) || (metaLucroLiquido !== undefined && lucroLiquidoMes < metaLucroLiquido)
-                          ? 'Abaixo da meta'
-                          : 'Dentro da meta' }
-                      </Badge>
-                    ) : (
-                      <span className="text-muted-foreground">Defina metas para acompanhar compatibilidade.</span>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+                <Card className="animate-fade-in">
+                  <CardHeader><CardTitle>Balanço e compatibilidade</CardTitle></CardHeader>
+                  <CardContent className="space-y-2 text-sm">
+                    <div className="flex justify-between"><span>Entradas (receita)</span><strong>R$ {receitaMes.toFixed(2)}</strong></div>
+                    <div className="flex justify-between"><span>Saídas variáveis</span><strong>R$ {custoVariavelMes.toFixed(2)}</strong></div>
+                    <div className="flex justify-between"><span>Saídas fixas</span><strong>R$ {totalCustosFixos.toFixed(2)}</strong></div>
+                    <div className="flex justify-between border-t pt-2"><span>Lucro bruto</span><strong>R$ {lucroBrutoMes.toFixed(2)}</strong></div>
+                    <div className="flex justify-between"><span>Lucro líquido</span><strong>R$ {lucroLiquidoMes.toFixed(2)}</strong></div>
+                    <div className="text-muted-foreground">Preço médio: R$ {precoMedio.toFixed(2)} • Unidades mês: {unidadesMes}</div>
+                    <div className="mt-2">
+                      {metaLucroBruto !== undefined || metaLucroLiquido !== undefined ? (
+                        <Badge variant={(metaLucroBruto !== undefined && lucroBrutoMes < metaLucroBruto) || (metaLucroLiquido !== undefined && lucroLiquidoMes < metaLucroLiquido) ? 'destructive' : 'default'}>
+                          { (metaLucroBruto !== undefined && lucroBrutoMes < metaLucroBruto) || (metaLucroLiquido !== undefined && lucroLiquidoMes < metaLucroLiquido)
+                            ? 'Abaixo da meta'
+                            : 'Dentro da meta' }
+                        </Badge>
+                      ) : (
+                        <span className="text-muted-foreground">Defina metas para acompanhar compatibilidade.</span>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
 
-            <Card>
-              <CardHeader><CardTitle>Registro diário de vendas</CardTitle></CardHeader>
-              <CardContent className="space-y-4">
-                <form onSubmit={addVenda} className="grid md:grid-cols-5 gap-2">
-                  <Input name="data" type="date" />
-                  <Input name="unidades" type="number" placeholder="Unidades" />
-                  <Input name="preco" type="number" step="0.01" placeholder="Preço/unid." />
-                  <div className="md:col-span-2 flex items-center gap-4 text-sm text-muted-foreground">
-                    <span>Custos variáveis/unid.: R$ {custoVarUnidEfetivo.toFixed(2)}</span>
-                    <span>Fixos/unid.: R$ {custoFixoDilPorUnid.toFixed(2)}</span>
-                  </div>
-                  <div className="md:col-span-5"><Button type="submit">Registrar</Button></div>
-                </form>
-                <Table aria-labelledby="titulo-vendas">
-                  <TableCaption id="titulo-vendas">Vendas registradas</TableCaption>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Data</TableHead>
-                      <TableHead>Unidades</TableHead>
-                      <TableHead>Preço/unid.</TableHead>
-                      <TableHead>Receita</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {vendas.map(v=> (
-                      <TableRow key={v.id}>
-                        <TableCell>{v.data}</TableCell>
-                        <TableCell>{v.unidades}</TableCell>
-                        <TableCell>R$ {v.preco_unitario.toFixed(2)}</TableCell>
-                        <TableCell>R$ {(v.unidades*v.preco_unitario).toFixed(2)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+                <Card>
+                  <CardHeader><CardTitle>Registro diário de vendas</CardTitle></CardHeader>
+                  <CardContent className="space-y-4">
+                    <form onSubmit={addVenda} className="grid md:grid-cols-5 gap-2">
+                      <Input name="data" type="date" />
+                      <Input name="unidades" type="number" placeholder="Unidades" />
+                      <Input name="preco" type="number" step="0.01" placeholder="Preço/unid." />
+                      <div className="md:col-span-2 flex items-center gap-4 text-sm text-muted-foreground">
+                        <span>Custos variáveis/unid.: R$ {custoVarUnidEfetivo.toFixed(2)}</span>
+                        <span>Fixos/unid.: R$ {custoFixoDilPorUnid.toFixed(2)}</span>
+                      </div>
+                      <div className="md:col-span-5"><Button type="submit">Registrar</Button></div>
+                    </form>
+                    <Table aria-labelledby="titulo-vendas">
+                      <TableCaption id="titulo-vendas">Vendas registradas</TableCaption>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Data</TableHead>
+                          <TableHead>Unidades</TableHead>
+                          <TableHead>Preço/unid.</TableHead>
+                          <TableHead>Receita</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {vendas.map(v=> (
+                          <TableRow key={v.id}>
+                            <TableCell>{v.data}</TableCell>
+                            <TableCell>{v.unidades}</TableCell>
+                            <TableCell>R$ {v.preco_unitario.toFixed(2)}</TableCell>
+                            <TableCell>R$ {(v.unidades*v.preco_unitario).toFixed(2)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              </div>
+            </PageTurn>
           </TabsContent>
 
           <TabsContent value="vendas" className="mt-6 space-y-6">
