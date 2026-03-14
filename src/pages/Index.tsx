@@ -357,7 +357,7 @@ const Index = () => {
                 value={tab} 
                 className="font-black text-xl uppercase tracking-tight border-b-4 border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:text-foreground rounded-none px-0 py-2 transition-all opacity-40 data-[state=active]:opacity-100 hover:opacity-100"
               >
-                {tab === 'protocolo' ? 'Folha de Rosto' : (tab.charAt(0).toUpperCase() + tab.slice(1))}
+                {tab === 'protocolo' ? 'Checklist' : (tab.charAt(0).toUpperCase() + tab.slice(1))}
               </TabsTrigger>
             ))}
           </TabsList>
@@ -399,11 +399,12 @@ const Index = () => {
                           <Label className="text-xs font-black uppercase tracking-widest block mb-4">Escala de Disponibilidade</Label>
                           <div className="grid grid-cols-5 gap-2">
                             {dias.map(d => (
-                              <div key={d} className="space-y-2 text-center">
-                                <span className="text-[10px] font-black uppercase opacity-60">{labelDia[d]}</span>
+                              <div key={d} className="space-y-2 text-center border-r border-foreground/10 last:border-0 pr-1">
+                                <span className="text-[10px] font-black uppercase opacity-60 block mb-1">{labelDia[d]}</span>
                                 {["manha", "tarde", "noite"].map(t => (
-                                  <div key={t} className="flex flex-col items-center">
-                                    <input type="checkbox" name={`${d}-${t}`} className="w-5 h-5 accent-foreground cursor-pointer border-2 border-foreground rounded-none" title={`${labelDia[d]} - ${labelTurno[t as Turno]}`} />
+                                  <div key={t} className="flex items-center justify-between gap-1 mb-1">
+                                    <span className="text-[8px] font-black opacity-40 uppercase">{t === 'manha' ? 'M' : t === 'tarde' ? 'T' : 'N'}</span>
+                                    <input type="checkbox" name={`${d}-${t}`} className="w-4 h-4 accent-foreground cursor-pointer border-2 border-foreground rounded-none" title={`${labelDia[d]} - ${labelTurno[t as Turno]}`} />
                                   </div>
                                 ))}
                               </div>
@@ -645,19 +646,25 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="vendas" className="mt-0 focus-visible:outline-none">
-            <Suspense fallback={<div className="p-20 text-center font-black uppercase italic text-4xl animate-pulse">Consultando o Mercado...</div>}>
-              <ProjecaoVendas />
-            </Suspense>
+            <PageTurn pageKey="vendas">
+              <Suspense fallback={<div className="p-20 text-center font-black uppercase italic text-4xl animate-pulse">Consultando o Mercado...</div>}>
+                <ProjecaoVendas />
+              </Suspense>
+            </PageTurn>
           </TabsContent>
 
           <TabsContent value="entradas" className="mt-0 focus-visible:outline-none">
-             <EntradasPanel />
+             <PageTurn pageKey="entradas">
+               <EntradasPanel />
+             </PageTurn>
           </TabsContent>
 
           <TabsContent value="integracao" className="mt-0 focus-visible:outline-none">
-            <Suspense fallback={<div className="p-20 text-center font-black uppercase italic text-4xl animate-pulse">Sincronizando Sistemas...</div>}>
-              <IntegracaoVendas />
-            </Suspense>
+            <PageTurn pageKey="integracao">
+              <Suspense fallback={<div className="p-20 text-center font-black uppercase italic text-4xl animate-pulse">Sincronizando Sistemas...</div>}>
+                <IntegracaoVendas />
+              </Suspense>
+            </PageTurn>
           </TabsContent>
 
           <TabsContent value="cas" className="mt-0 focus-visible:outline-none">
@@ -680,17 +687,58 @@ const Index = () => {
                   <Button type="submit" className="md:col-span-6 h-12 rounded-none border-4 border-foreground bg-foreground text-background font-black uppercase italic shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">Mapear Entidade</Button>
                 </form>
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {cas.map(ca => (
-                    <div key={ca.id} className="border-2 border-foreground p-4 bg-background hover:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] transition-all">
-                      <div className="flex justify-between items-start mb-4 border-b border-foreground/20 pb-2">
-                        <h4 className="text-2xl font-black uppercase leading-none">{ca.nome}</h4>
-                        <Badge className={cn("rounded-none font-black uppercase text-[10px]", ca.status === 'aliado' ? 'bg-green-600' : 'bg-foreground')}>{ca.status}</Badge>
+                  {cas.map(ca => {
+                    const isEditing = editingCA === ca.id;
+                    return (
+                      <div key={ca.id} className="border-2 border-foreground p-4 bg-background hover:shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] transition-all flex flex-col justify-between">
+                        {isEditing ? (
+                          <div className="space-y-3">
+                            <Input 
+                              defaultValue={ca.nome} 
+                              className="rounded-none border-2 border-foreground font-black uppercase h-8"
+                              onBlur={(e) => updateCA(ca.id, { nome: e.target.value })}
+                            />
+                            <Select 
+                              defaultValue={ca.status} 
+                              onValueChange={(v) => updateCA(ca.id, { status: v })}
+                            >
+                              <SelectTrigger className="rounded-none border-2 border-foreground h-8"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="aliado">Aliado</SelectItem>
+                                <SelectItem value="neutro">Neutro</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Input 
+                              defaultValue={ca.relacao} 
+                              className="rounded-none border-2 border-foreground italic h-8"
+                              onBlur={(e) => updateCA(ca.id, { relacao: e.target.value })}
+                            />
+                            <Button 
+                              className="w-full h-8 rounded-none bg-foreground text-background font-black text-[10px] uppercase"
+                              onClick={() => setEditingCA(null)}
+                            >
+                              Salvar
+                            </Button>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="flex justify-between items-start mb-4 border-b border-foreground/20 pb-2">
+                              <h4 className="text-2xl font-black uppercase leading-none">{ca.nome}</h4>
+                              <Badge className={cn("rounded-none font-black uppercase text-[10px]", ca.status === 'aliado' ? 'bg-green-600' : 'bg-foreground')}>{ca.status}</Badge>
+                            </div>
+                            <div className="space-y-2 mb-4">
+                              <p className="text-sm italic"><strong>Relação:</strong> {ca.relacao}</p>
+                              <p className="text-sm"><strong>Oportunidades:</strong> {ca.oportunidades || '—'}</p>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <Button variant="outline" size="sm" className="rounded-none border-2 border-foreground font-black text-[10px] uppercase" onClick={() => setEditingCA(ca.id)}>Editar</Button>
+                              <Button variant="outline" size="sm" className="rounded-none border-2 border-foreground font-black text-[10px] uppercase hover:bg-red-600 hover:text-white" onClick={() => deleteCA(ca.id)}>Remover</Button>
+                            </div>
+                          </>
+                        )}
                       </div>
-                      <p className="text-sm italic mb-2"><strong>Relação:</strong> {ca.relacao}</p>
-                      <p className="text-sm mb-4"><strong>Oportunidades:</strong> {ca.oportunidades || '—'}</p>
-                      <Button variant="outline" size="sm" className="w-full rounded-none border-2 border-foreground font-black text-xs uppercase" onClick={() => deleteCA(ca.id)}>Remover</Button>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </PageTurn>

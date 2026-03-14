@@ -11,17 +11,48 @@ const PageTurn = ({ children, pageKey }: PageTurnProps) => {
     <AnimatePresence mode="wait">
       <motion.div
         key={pageKey}
-        initial={{ rotateY: -110, opacity: 0, x: "20%" }}
-        animate={{ rotateY: 0, opacity: 1, x: 0 }}
-        exit={{ rotateY: 110, opacity: 0, x: "-20%" }}
-        transition={{ 
-          duration: 0.7, 
-          ease: [0.4, 0, 0.2, 1], // Custom cubic-bezier for a physical "paper" feel
+        initial={{ 
+          rotateY: -45, 
+          skewY: 5,
+          opacity: 0, 
+          x: "30%",
+          scale: 0.95
         }}
-        style={{ transformOrigin: "right center", perspective: "2000px" }}
-        className="w-full h-full bg-background relative overflow-hidden"
+        animate={{ 
+          rotateY: 0, 
+          skewY: 0,
+          opacity: 1, 
+          x: 0,
+          scale: 1
+        }}
+        exit={{ 
+          rotateY: 45, 
+          skewY: -5,
+          opacity: 0, 
+          x: "-30%",
+          scale: 0.95
+        }}
+        transition={{ 
+          duration: 0.8, 
+          ease: [0.23, 1, 0.32, 1], // Smooth deceleration
+        }}
+        style={{ 
+          transformOrigin: "right center", 
+          perspective: "1200px",
+          transformStyle: "preserve-3d"
+        }}
+        className="w-full h-full bg-background relative"
       >
-        <div className="border-r-4 border-foreground/5 pr-4 h-full">
+        {/* Shadow Overlay to simulate the "bend" depth */}
+        <motion.div 
+          className="absolute inset-0 pointer-events-none z-10"
+          initial={{ background: "linear-gradient(to right, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0) 100%)" }}
+          animate={{ background: "linear-gradient(to right, rgba(0,0,0,0) 0%, rgba(0,0,0,0) 100%)" }}
+          exit={{ background: "linear-gradient(to right, rgba(0,0,0,0) 0%, rgba(0,0,0,0.2) 100%)" }}
+          transition={{ duration: 0.8 }}
+        />
+        
+        <div className="h-full">
           {children}
         </div>
       </motion.div>
